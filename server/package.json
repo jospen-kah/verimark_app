@@ -1,0 +1,20 @@
+{
+  "name": "verimark-app",
+  "version": "1.0.0",
+  "description": "Verimark application backend",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.16.0",
+    "mongoose": "^8.15.0",
+    "nodemailer": "^7.0.3",
+    "nodemon": "^3.1.10"
+  }
+}
