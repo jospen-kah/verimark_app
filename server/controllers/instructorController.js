@@ -1,7 +1,7 @@
-const User = require('../models/userModel');
+const User = require('../models/User');
 
 // Get all instructors waiting for approval
-exports.getPendingInstructors = async (req, res) => {
+const getPendingInstructors = async (req, res) => {
   try {
     const pending = await User.find({ role: 'instructor', isApproved: false });
     res.status(200).json(pending);
@@ -11,7 +11,7 @@ exports.getPendingInstructors = async (req, res) => {
 };
 
 // Approve instructor (only by superadmin)
-exports.approveInstructor = async (req, res) => {
+const approveInstructor = async (req, res) => {
   try {
     const instructor = await User.findById(req.params.id);
 
@@ -31,11 +31,18 @@ exports.approveInstructor = async (req, res) => {
 };
 
 // Optional: Get list of all approved instructors
-exports.getAllInstructors = async (req, res) => {
+const getAllInstructors = async (req, res) => {
   try {
     const instructors = await User.find({ role: 'instructor', isApproved: true });
     res.status(200).json(instructors);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+};
+
+
+module.exports = {
+  getPendingInstructors,
+  approveInstructor,
+  getAllInstructors,
 };
