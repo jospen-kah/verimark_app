@@ -5,3 +5,5 @@ const faceDataSchema = new mongoose.Schema({
     faceData: { type: [Number], default: [] }, // Array of numbers representing face data
     createdAt: { type: Date, default: Date.now } // Timestamp for when the face data was created
 });
+
+module.exports = mongoose.model('FaceData', faceDataSchema);
