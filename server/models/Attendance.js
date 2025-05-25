@@ -1,13 +1,13 @@
 const mongoose = require('mongoose');
+const { Schema, Types } = mongoose;
 
-const attendanceSchema = new mongoose.Schema({
-  courseId: { type: ObjectId, ref: 'Course' },
-  instructorId: { type: ObjectId, ref: 'Instructor' },
-  hallId: { type: ObjectId, ref: 'Hall' }, // Selected hall for session
-  startTime: Date,
-  endTime: Date,
-  status: { type: String, enum: ['open', 'closed'], default: 'open' },
-  createdAt: Date
+const attendanceSchema = new Schema({
+  courseId: { type: Types.ObjectId, ref: 'Course', required: true },
+  instructorId: { type: Types.ObjectId, ref: 'Instructor', required: true },
+  hallId: { type: Types.ObjectId, ref: 'Hall', required: true },
+  startTime: { type: Date, default: Date.now },
+  endTime: { type: Date },
+  status: { type: String, enum: ['open', 'closed'], default: 'open' }
 });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

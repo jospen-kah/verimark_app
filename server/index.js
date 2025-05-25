@@ -3,6 +3,9 @@ const connectDB = require('./db');
 const instructorRoutes = require('./routes/instructorRoutes');
 const faceRoutes = require('./routes/faceRoutes');
 const { loadModels } = require('./services/face.service');
+const attendanceRoutes = require('./routes/attendanceRoutes');
+const hallRoutes = require('./routes/hallRoute');
+const courseRoutes = require('./routes/courseRoutes')
 
 
 const app = express();
@@ -11,6 +14,9 @@ app.use(express.json());
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/instructors', instructorRoutes);
 app.use('/api/face', faceRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/halls', hallRoutes);
+app.use('/api/courses', courseRoutes);
 
 
 

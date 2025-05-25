@@ -30,7 +30,7 @@ exports.protect = async (req, res, next) => {
 // Middleware to restrict access to specific roles
 exports.restrictTo = (...allowedRoles) => {
   return (req, res, next) => {
-    console.log("user role", req.user.role);  
+    // console.log("user role", req.user.role);  
     if (!req.user || !allowedRoles.includes(req.user.role)) {
       return res.status(403).json({ message: 'You do not have permission to perform this action' });
     }

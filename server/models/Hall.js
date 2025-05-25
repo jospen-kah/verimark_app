@@ -1,13 +1,17 @@
 const mongoose = require('mongoose');
+const { Schema, Types } = mongoose;
+const { ObjectId } = Types;
 
-const hallSchema = new mongoose.Schema({
-  name: String, // e.g., "LT1", "Auditorium"
-  description: String, // Optional
+const coordinateSchema = new Schema({
   latitude: Number,
   longitude: Number,
   altitude: Number,
-  radius: Number, // Geofence radius in meters
-  createdAt: Date
 });
 
-module.exports = mongoose.model('Hall', hallSchema);    
+const hallSchema = new Schema({
+  name: { type: String, required: true },
+  coordinates: [coordinateSchema],  // Array of polygon points with altitude
+  createdAt: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model('Hall', hallSchema);
