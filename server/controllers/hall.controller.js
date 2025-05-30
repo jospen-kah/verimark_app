@@ -2,15 +2,34 @@ const Hall = require('../models/Hall');
 
 exports.createHall = async (req, res) => {
   try {
-    const { name, coordinates } = req.body;
+    const { name, coordinates, minAltitude, maxAltitude } = req.body;
 
-    if (!name || !coordinates || !Array.isArray(coordinates) || coordinates.length === 0) {
-      return res.status(400).json({ message: 'Name and coordinates (array) are required' });
+    // Validate required fields
+    if (
+      !name ||
+      !coordinates ||
+      !Array.isArray(coordinates) ||
+      coordinates.length === 0 ||
+      typeof minAltitude !== 'number' ||
+      typeof maxAltitude !== 'number'
+    ) {
+      return res.status(400).json({
+        message: 'Name, coordinates (array), minAltitude, and maxAltitude are required and must be valid.'
+      });
+    }
+
+    // Optional: Validate altitude logic
+    if (minAltitude >= maxAltitude) {
+      return res.status(400).json({
+        message: 'minAltitude must be less than maxAltitude.'
+      });
     }
 
     const newHall = new Hall({
       name,
-      coordinates
+      coordinates,
+      minAltitude,
+      maxAltitude
     });
 
     await newHall.save();

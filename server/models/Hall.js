@@ -1,17 +1,16 @@
 const mongoose = require('mongoose');
-const { Schema, Types } = mongoose;
-const { ObjectId } = Types;
-
-const coordinateSchema = new Schema({
-  latitude: Number,
-  longitude: Number,
-  altitude: Number,
-});
+const { Schema } = mongoose;
 
 const hallSchema = new Schema({
   name: { type: String, required: true },
-  coordinates: [coordinateSchema],  // Array of polygon points with altitude
-  createdAt: { type: Date, default: Date.now }
+  coordinates: [
+    {
+      latitude: Number,
+      longitude: Number
+    }
+  ],
+  minAltitude: { type: Number, required: true }, // e.g., ground floor = 400
+  maxAltitude: { type: Number, required: true }, // e.g., first floor = 404
 });
 
 module.exports = mongoose.model('Hall', hallSchema);
