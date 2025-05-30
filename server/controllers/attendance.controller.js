@@ -82,17 +82,20 @@ exports.checkIn = async (req, res) => {
 // Check-out controller
 exports.checkOut = async (req, res) => {
   try {
-    const { latitude, longitude } = req.body;
+    const { attendanceId, latitude, longitude } = req.body;
 
-    const session = await Attendance.findOne({ status: 'open' })
-      .sort({ startTime: -1 })
+    // Find the specific attendance session
+    const session = await Attendance.findOne({ _id: attendanceId, status: 'open' })
       .populate('hallId');
 
-    if (!session) return res.status(404).json({ message: 'No active session' });
+    if (!session) return res.status(404).json({ message: 'No active session found for the given attendanceId' });
 
     const hall = session.hallId;
+
+    // Get current altitude from external service
     const altitude = await getElevation(latitude, longitude);
 
+    // Check if user is inside the hall geofence (with altitude)
     const isInside = isInsidePolygonWithAltitude(
       { latitude, longitude, altitude },
       hall.coordinates,
@@ -101,18 +104,18 @@ exports.checkOut = async (req, res) => {
     );
 
     if (!isInside) {
-      return res.status(403).json({ message: 'You are not in the hall geofence' });
+      return res.status(403).json({ message: 'You are not within the geofenced hall area' });
     }
 
-    // Find the most recent check-in without a checkout for this student/session
+    // Find the most recent check-in for this session without a checkout
     const lastLog = await AttendanceLog.findOne({
-      attendanceId: session._id,
+      attendanceId,
       studentId: req.user._id,
       checkOutTime: { $exists: false }
     }).sort({ checkInTime: -1 });
 
     if (!lastLog) {
-      return res.status(400).json({ message: 'No check-in record found to check out from' });
+      return res.status(400).json({ message: 'No open check-in record found to check out from' });
     }
 
     lastLog.checkOutTime = new Date();
@@ -124,7 +127,6 @@ exports.checkOut = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
 
 
 exports.getAttendanceSessionSummary = async (req, res) => {
