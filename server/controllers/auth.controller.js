@@ -1,12 +1,11 @@
-
-
-require('dotenv').config();
-const express = require('express');
-
-const User = require('../models/User');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+require("dotenv").config();
+const express = require("express");
+const crypto = require("crypto");
+const User = require("../models/User");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const sendEmail = require("../utils/sendEmail");
+const PendingUser = require("../models/PendingUser");
 
 const generateToken = (user) => {
   return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
@@ -14,31 +13,120 @@ const generateToken = (user) => {
   });
 };
 
-// Register
+// Register a new user
 const register = async (req, res) => {
   try {
-    const { firstName, lastName, email, password,confirmPassword, role, matriNumber } = req.body;
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      confirmPassword,
+      role,
+      matriNumber,
+    } = req.body;
+
+    // Check for required fields
+    if (
+      !firstName ||
+      !lastName ||
+      !email ||
+      !password ||
+      !confirmPassword ||
+      !role
+    ) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+
+    // Role-specific check
+    if (role === "student" && !matriNumber) {
+      return res
+        .status(400)
+        .json({ message: "Matricule number is required for students." });
+    }
 
     // Check if passwords match
     if (password !== confirmPassword) {
-      return res.status(400).json({ message: 'Passwords do not match.' });
+      return res.status(400).json({ message: "Passwords do not match." });
     }
 
-    // Check required fields based on role
-    if (role === 'student' && !matriNumber) {
-      return res.status(400).json({ message: 'Matricule number is required for students.' });
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists." });
     }
 
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const user = await User.create({
+    // Generate 4-digit code and expiry
+    const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const codeExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+    // Clean up old unverified attempt
+    await PendingUser.findOneAndDelete({ email });
+
+    // Store pending user
+    await PendingUser.create({
       firstName,
       lastName,
       email,
       password: hashedPassword,
       role,
-      matriNumber: role === 'student' ? matriNumber : undefined
+      matriNumber: role === "student" ? matriNumber : undefined,
+      verificationCode,
+      codeExpires,
     });
+
+    // Send email
+    console.log("Sending email to:", email),
+      await sendEmail({
+        to: email,
+        subject: "Verify Your Email",
+        text: `Your verification code is: ${verificationCode}`,
+      });
+
+    res.status(200).json({ message: "Verification code sent to your email." });
+  } catch (err) {
+    console.error("Registration error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports = {
+  register,
+};
+
+//verify email
+const verifyEmail = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    const pendingUser = await PendingUser.findOne({ email });
+    if (!pendingUser) {
+      return res
+        .status(404)
+        .json({ message: "No pending registration found." });
+    }
+
+    if (
+      pendingUser.verificationCode !== code ||
+      pendingUser.codeExpires < Date.now()
+    ) {
+      return res.status(400).json({ message: "Invalid or expired code." });
+    }
+
+    // Create actual user
+    const user = await User.create({
+      firstName: pendingUser.firstName,
+      lastName: pendingUser.lastName,
+      email: pendingUser.email,
+      password: pendingUser.password,
+      role: pendingUser.role,
+      matriNumber: pendingUser.matriNumber,
+    });
+
+    await PendingUser.findByIdAndDelete(pendingUser._id);
 
     const token = generateToken(user);
     res.status(201).json({ token, user });
@@ -54,7 +142,7 @@ const login = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user || !(await bcrypt.compare(password, user.password)))
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: "Invalid credentials" });
 
     const token = generateToken(user);
     res.status(200).json({ token, user });
@@ -62,10 +150,6 @@ const login = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
-
-
-
 
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
@@ -99,7 +183,6 @@ const forgotPassword = async (req, res) => {
 
 //reset Password
 
-
 const resetPassword = async (req, res) => {
   const { email, resetCode, newPassword, confirmPassword } = req.body;
 
@@ -112,7 +195,7 @@ const resetPassword = async (req, res) => {
     if (newPassword !== confirmPassword) {
       return res.status(400).json({ message: "Passwords do not match" });
     }
-    
+
     // Check if reset code matches and is not expired
     if (
       user.resetCode !== resetCode ||
@@ -139,10 +222,10 @@ const resetPassword = async (req, res) => {
   }
 };
 
-
 module.exports = {
   register,
+  verifyEmail,
   login,
   forgotPassword,
-  resetPassword
+  resetPassword,
 };

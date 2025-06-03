@@ -51,7 +51,7 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Image source={require('@/assets/images/verimark-logo.png')} style={styles.image} />
+          <Image source={require('@/assets/images/verimark-logo-2.png')} style={styles.image} />
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>to <Text style={styles.brandName}>VeriMark</Text></Text>
         </View>
@@ -123,6 +123,14 @@ export default function LoginScreen() {
               <Text style={styles.registerLink}>Register</Text>
             </TouchableOpacity>
           </View>
+
+          <View>
+            <TouchableOpacity 
+            onPress={() => router.push('/student/screens/HomeScreen')}
+            >
+            <Text>student</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -135,13 +143,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   image: {
-    width: 60,
-    height: 60,
-    marginRight: 15,
+    width: 80,
+    height: 80,
+    
   },
   header: {
     paddingHorizontal: 30,
     marginBottom: 30,
+    paddingTop: 50,
   },
   title: {
     fontSize: 28,

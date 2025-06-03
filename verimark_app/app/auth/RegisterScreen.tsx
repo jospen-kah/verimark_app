@@ -70,7 +70,7 @@ export default function RegisterScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
 
         <View style={styles.header}>
-          <Image source={require('@/assets/images/verimark-logo.png')} style={styles.image} />
+          <Image source={require('@/assets/images/verimark-logo-2.png')} style={styles.image} />
           <Text style={styles.title}>Register Account</Text>
           <Text style={styles.subtitle}>
             to <Text style={styles.brandName}>VeriMark</Text>
@@ -256,11 +256,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   image: {
-    width: 60,
-  height: 60,
-  marginRight: 15,
+    paddingTop: 30,
+    width: 80,
+    height: 80,
+    
+  
   },
   header: {
+    paddingTop: 70,
     paddingHorizontal: 30,
     marginBottom: 30,
   },

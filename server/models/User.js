@@ -20,12 +20,13 @@ const userSchema = new mongoose.Schema({
   // Student-specific
   matriNumber: { type: String, unique: true, sparse: true }, // Optional, but required for students
   faceData: { type: [Number], default: [] }, // e.g., Face embedding
+  faceImageUrl: { type: String }, // 🔹 URL/path to face image
+
   enrolledCourses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
 
   // For password reset with 4-digit code
   resetCode: String,
   resetCodeExpires: Date,
-
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

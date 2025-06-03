@@ -102,7 +102,10 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
                 <View style={styles.footer}>
                     <Text style={styles.footerText}>
                         Didn't have an account?
-                        <Text style={styles.registerLink}> Register</Text>
+                        <TouchableOpacity 
+                        onPress={() => router.push('/auth/RegisterScreen')}>
+                            <Text style={styles.registerLink}> Register</Text>
+                        </TouchableOpacity>
                     </Text>
                 </View>
             </KeyboardAvoidingView>

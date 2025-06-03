@@ -118,7 +118,11 @@ const RecoverScreen = ({ navigation, route }: VerificationScreenProps) => {
       <View style={styles.footer}>
         <Text style={styles.footerText}>
           Didn't have an account? 
+          <TouchableOpacity 
+          onPress={ () => router.push('/auth/RegisterScreen')}
+          >
           <Text style={styles.registerLink}> Register</Text>
+          </TouchableOpacity>
         </Text>
       </View>
     </SafeAreaView>

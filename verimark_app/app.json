@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "verimark_app",
+    "name": "verimark",
     "slug": "verimark_app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/verimark-logo-2.png",
     "scheme": "verimarkapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
