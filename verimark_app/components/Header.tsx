@@ -9,14 +9,14 @@ type HeaderProps = {
 const Header: React.FC<HeaderProps> = ({ name }) => (
   <View style={styles.container}>
     <View>
-      <Image source={require('../../../assets/images/verimark-logo-2.png')} style={styles.logo} />
-    </View>
+      <Image source={require('../assets/images/verimark-logo-2.png')} style={styles.logo} />
+      </View>
     <View style={styles.rightSection}>
       {/* Notification Icon */}
       <TouchableOpacity onPress={() => console.log('Notifications')}>
         <Ionicons name="notifications-outline" size={25} color="black" />
       </TouchableOpacity>
-      <Image source={require('../../../assets/images/profile.jpg')} style={styles.avatar} />
+      <Image source={require('../assets/images/profile.jpg')} style={styles.avatar} />
     </View>
   </View>
 );

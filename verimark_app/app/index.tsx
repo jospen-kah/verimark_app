@@ -16,7 +16,7 @@ export default function WelcomeScreen() {
         style={styles.image}
       />
       <ThemedText style={styles.header} type="title">
-        Welcome to  VeriMark
+       Welcome to VeriMark
       </ThemedText>
 
       {/* Floating icon for navigation */}

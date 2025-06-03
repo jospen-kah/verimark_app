@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import StudentTabNavigator from './app/student/(tabs)/StudentTabNavigator';
+import StudentTabNavigator from '../app/(tabs)/_layout';  
 
 export default function App() {
   return (
