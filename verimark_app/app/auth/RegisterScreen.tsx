@@ -10,17 +10,19 @@ import {
   Alert,
   Dimensions,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import axios from 'axios';
 
 const { width } = Dimensions.get('window');
 
 export default function RegisterScreen() {
   const [formData, setFormData] = useState({
-    firstName: 'Michael',
-    lastName: 'Ntic',
-    email: 'michael.ntic@example.com',
+    firstName: '',
+    lastName: '',
+    email: '',
     password: '',
     confirmPassword: '',
     selectRole: 'Instructor',
@@ -31,6 +33,7 @@ export default function RegisterScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const roles = ['Instructor', 'Student'];
 
@@ -41,7 +44,7 @@ export default function RegisterScreen() {
     }));
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!agreedToTerms) {
       Alert.alert('Error', 'Please agree to the Terms & Conditions and Privacy Policy');
       return;
@@ -57,8 +60,43 @@ export default function RegisterScreen() {
       return;
     }
 
-    // Handle registration logic here
-    Alert.alert('Success', 'Registration submitted!');
+    setLoading(true);
+    try {
+      await axios.post('http://192.168.1.116:3000/api/auth/register', {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+        confirmPassword: formData.confirmPassword,
+        role: formData.selectRole.toLowerCase(),
+        ...(formData.selectRole === 'Student' && { matricule: formData.matricule }),
+        matriNumber: formData.matricule,
+      });
+
+      Alert.alert('Email Sent', 'Verification email sent! Please check your inbox.', [
+        {
+          text: 'OK',
+          onPress: () => router.push({
+            pathname: '/auth/VerifyEmailScreen',
+            params: { email: formData.email },
+          }),
+        },
+      ]);
+    } catch (error: any) {
+      const backendMsg = error.response?.data?.message;
+      if (backendMsg === "User already exists.") {
+        Alert.alert('User Exists', 'Account already exists. Redirecting to login...', [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/auth/LoginScreen'),
+          },
+        ]);
+      } else {
+        Alert.alert('Error', backendMsg || 'Registration failed');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleSignIn = () => {
@@ -68,45 +106,39 @@ export default function RegisterScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-
         <View style={styles.header}>
           <Image source={require('@/assets/images/verimark-logo-2.png')} style={styles.image} />
           <Text style={styles.title}>Register Account</Text>
-          <Text style={styles.subtitle}>
-            to <Text style={styles.brandName}>VeriMark</Text>
-          </Text>
+          <Text style={styles.subtitle}>to <Text style={styles.brandName}>VeriMark</Text></Text>
           <Text style={styles.description}>Hello there, register to continue</Text>
         </View>
 
         <View style={styles.form}>
-          {/* First Name */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>First Name</Text>
             <TextInput
               style={styles.input}
-              // value={formData.firstName}
+              value={formData.firstName}
               onChangeText={(value) => handleInputChange('firstName', value)}
               placeholder="Enter your first name"
             />
           </View>
 
-          {/* Last Name */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Last Name</Text>
             <TextInput
               style={styles.input}
-              // value={formData.lastName}
+              value={formData.lastName}
               onChangeText={(value) => handleInputChange('lastName', value)}
               placeholder="Enter your last name"
             />
           </View>
 
-          {/* Email */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email Address</Text>
             <TextInput
               style={styles.input}
-              // value={formData.email}
+              value={formData.email}
               onChangeText={(value) => handleInputChange('email', value)}
               placeholder="Enter your email"
               keyboardType="email-address"
@@ -114,7 +146,6 @@ export default function RegisterScreen() {
             />
           </View>
 
-          {/* Password */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Password</Text>
             <View style={styles.passwordContainer}>
@@ -134,7 +165,6 @@ export default function RegisterScreen() {
             </View>
           </View>
 
-          {/* Confirm Password */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Confirm Password</Text>
             <View style={styles.passwordContainer}>
@@ -154,7 +184,6 @@ export default function RegisterScreen() {
             </View>
           </View>
 
-          {/* Select Role Dropdown */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Select Role</Text>
             <TouchableOpacity
@@ -162,11 +191,7 @@ export default function RegisterScreen() {
               onPress={() => setShowDropdown(!showDropdown)}
             >
               <Text style={styles.dropdownText}>{formData.selectRole}</Text>
-              <Ionicons
-                name={showDropdown ? 'chevron-up' : 'chevron-down'}
-                size={20}
-                color="#666"
-              />
+              <Ionicons name={showDropdown ? 'chevron-up' : 'chevron-down'} size={20} color="#666" />
             </TouchableOpacity>
 
             {showDropdown && (
@@ -187,7 +212,6 @@ export default function RegisterScreen() {
             )}
           </View>
 
-          {/* Matricule Input (Visible Only if Role is Student) */}
           {formData.selectRole === 'Student' && (
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Matricule Number</Text>
@@ -200,7 +224,6 @@ export default function RegisterScreen() {
             </View>
           )}
 
-          {/* Terms and Conditions */}
           <View style={styles.checkboxContainer}>
             <TouchableOpacity
               style={styles.checkbox}
@@ -211,25 +234,24 @@ export default function RegisterScreen() {
               )}
             </TouchableOpacity>
             <Text style={styles.checkboxText}>
-              I agree to the{' '}
-              <Text style={styles.link}>Terms & Conditions & Privacy Policy</Text>{' '}
-              set out by this site
+              I agree to the <Text style={styles.link}>Terms & Conditions & Privacy Policy</Text>
             </Text>
           </View>
 
-          {/* Register Button */}
-          <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
-            <Text style={styles.registerButtonText}>Register</Text>
+          <TouchableOpacity style={styles.registerButton} onPress={handleRegister} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.registerButtonText}>Register</Text>
+            )}
           </TouchableOpacity>
 
-          {/* Divider */}
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>Or continue with social account</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Google Sign In */}
           <TouchableOpacity style={styles.googleButton} onPress={handleGoogleSignIn}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <AntDesign name="google" size={20} color="#4A90E2" style={{ marginRight: 10 }} />
@@ -237,7 +259,6 @@ export default function RegisterScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Login Link */}
           <View style={styles.loginContainer}>
             <Text style={styles.loginText}>Already have an account? </Text>
             <TouchableOpacity onPress={() => router.push('/auth/LoginScreen')}>
@@ -259,8 +280,8 @@ const styles = StyleSheet.create({
     paddingTop: 30,
     width: 80,
     height: 80,
-    
-  
+
+
   },
   header: {
     paddingTop: 70,

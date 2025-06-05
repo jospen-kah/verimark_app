@@ -4,17 +4,17 @@ import Header from '../../../../components/Header';
 import ClassCard from '../../../../components/ClassCard';
 import { router } from 'expo-router';
 
-type HomeScreenProps = {
+type StudentHomeScreenProps = {
   title?: string;
 };
 
-const HomeScreen: React.FC<HomeScreenProps> = ({ title }) => {
+const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ title }) => {
   const name = "Michael Mitc";
+  
   return (
     <View style={styles.container}>
       <Header name={name} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-
         <View style={styles.headerContainer}>
           <View style={styles.header}>
             <View>
@@ -24,38 +24,31 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ title }) => {
           </View>
 
           <View style={styles.grid}>
-            <TouchableOpacity style={styles.box}
-              onPress={() => router.push('/student/screens/FaceRegistrationScreen')}
-                >
+            <TouchableOpacity 
+              style={styles.box}
+              onPress={() => router.push('/screens/student/otherScreens/StudentFaceRegistrationScreen')}
+            >
               <Text style={styles.boxText}>Face Registration</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-            onPress={() => router.push('/')}
-            style={styles.box}>
-              <Text style={styles.boxText}>History</Text>
+              onPress={() => router.push('/screens/student/(tabs)/studentAttendanceScreen')}
+              style={styles.box}
+            >
+              <Text style={styles.boxText}>Attendance</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.sectionTitle}>Today’s Classes</Text>
-
+          <Text style={styles.sectionTitle}>Today's Classes</Text>
+        <TouchableOpacity 
+          onPress={() => router.push('/screens/student/otherScreens/CheckinScreen')}
+          >
           <ClassCard
             title="CEF331 Advanced Database"
             time="10:00AM-12:00AM"
             hall="BGFL"
             status="Active"
           />
-          <ClassCard
-            title="CEF521 Software Engineering"
-            time="13:00PM-15:00PM"
-            hall="BGFL"
-            status="Upcoming"
-          />
-          <ClassCard
-            title="CEF521 Software Engineering"
-            time="13:00PM-15:00PM"
-            hall="BGFL"
-            status="Upcoming"
-          />
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -73,8 +66,14 @@ const styles = StyleSheet.create({
   headerContainer: {
     padding: 15,
   },
-  greeting: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  sub: { color: '#d0e5ff' },
+  greeting: { 
+    color: '#fff', 
+    fontSize: 18, 
+    fontWeight: 'bold' 
+  },
+  sub: { 
+    color: '#d0e5ff' 
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -112,4 +111,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HomeScreen;
+export default StudentHomeScreen;

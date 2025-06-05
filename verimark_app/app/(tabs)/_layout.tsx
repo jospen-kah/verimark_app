@@ -1,49 +1,22 @@
-import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
-import HomeScreen from './student/screens/HomeScreen';
-import AttendanceScreen from './student/screens/AttendanceScreen';
-import CourseScreen from './student/screens/CourseScreen';
-import ProfileScreen from './student/screens/ProfileScreen';
+import { Tabs } from 'expo-router';
+import { useUserRole } from '../../hooks/useUserRole';
+import CustomTabBar from '../../components/ui/CustomTabBar';
 
-
-const Tab = createBottomTabNavigator();
-
-const StudentTabNavigator = () => {
+export default function TabLayout() {
+  const { userRole } = useUserRole();
+  
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
+    <Tabs
+      screenOptions={{
         headerShown: false,
-        tabBarIcon: ({ color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
-
-          switch (route.name) {
-            case 'Home':
-              iconName = 'home';
-              break;
-            case 'Attendance':
-              iconName = 'calendar';
-              break;
-            case 'Course':
-              iconName = 'book';
-              break;
-            case 'Profile':
-              iconName = 'person';
-              break;
-            default:
-              iconName = 'ellipse';
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-      })}
+        tabBarStyle: { /* your tab bar styling */ },
+      }}
+      tabBar={(props) => <CustomTabBar {...props} userRole={userRole} />}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Attendance" component={AttendanceScreen} />
-      <Tab.Screen name="Course" component={CourseScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-    </Tab.Navigator>
+      <Tabs.Screen name="home" options={{ title: 'Home' }} />
+      <Tabs.Screen name="attendance" options={{ title: 'Attendance' }} />
+      <Tabs.Screen name="course" options={{ title: 'Course' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+    </Tabs>
   );
-};
-
-export default StudentTabNavigator;
+}

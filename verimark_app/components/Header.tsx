@@ -29,6 +29,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
+    paddingTop: 40,
   },
   rightSection: {
     flexDirection: 'row',

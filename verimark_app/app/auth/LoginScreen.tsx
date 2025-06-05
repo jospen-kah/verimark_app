@@ -13,14 +13,13 @@ import {
 } from 'react-native';
 import { Ionicons, AntDesign } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import axios from 'axios';
 
 const { width } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const [formData, setFormData] = useState({
     email: '',
-    firstName: '',
-    lastName: '',
     password: '',
   });
 
@@ -33,14 +32,29 @@ export default function LoginScreen() {
     }));
   };
 
-  const handleLogin = () => {
-    if (!formData.email || !formData.password || !formData.firstName || !formData.lastName) {
-      Alert.alert('Error', 'All fields are required');
+  const handleLogin = async () => {
+    if (!formData.email || !formData.password) {
+      Alert.alert('Error', 'Email and password are required');
       return;
     }
 
-    // Add actual login logic here
-    Alert.alert('Success', 'Logged in successfully!');
+    try {
+      const response = await axios.post('http://192.168.1.116:3000/api/auth/login', {
+        email: formData.email,
+        password: formData.password,
+      });
+
+      const user = response.data.user;
+      if (user.role === 'student') {
+        router.replace('/screens/student');
+      } else if (user.role === 'instructor') {
+        router.replace('/screens');
+      } else {
+        Alert.alert('Error', 'Unknown user role');
+      }
+    } catch (error: any) {
+      Alert.alert('Login Failed', error.response?.data?.message || 'Invalid credentials');
+    }
   };
 
   const handleGoogleSignIn = () => {
@@ -88,14 +102,13 @@ export default function LoginScreen() {
           </View>
 
           {/* Forgot Password */}
-    
-             <TouchableOpacity 
-             onPress={() => router.push('/auth/ForgotPasswordScreen')}
-             style={styles.forgotPasswordContainer}
-             >
-                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-             </TouchableOpacity>
-          
+          <TouchableOpacity
+            onPress={() => router.push('/auth/ForgotPasswordScreen')}
+            style={styles.forgotPasswordContainer}
+          >
+            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+          </TouchableOpacity>
+
           {/* Login Button */}
           <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
             <Text style={styles.loginButtonText}>Login</Text>
@@ -123,16 +136,15 @@ export default function LoginScreen() {
               <Text style={styles.registerLink}>Register</Text>
             </TouchableOpacity>
           </View>
-
-          <View>
-            <TouchableOpacity 
-            onPress={() => router.push('/student/screens/HomeScreen')}
-            >
-            <Text>student</Text>
-            </TouchableOpacity>
-          </View>
         </View>
-       
+
+        <TouchableOpacity onPress={() => router.push('/screens/student')}>
+          <Text>Student</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/screens')}>
+          <Text>Instructor</Text>
+        </TouchableOpacity>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -146,7 +158,6 @@ const styles = StyleSheet.create({
   image: {
     width: 80,
     height: 80,
-    
   },
   header: {
     paddingHorizontal: 30,

@@ -8,6 +8,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Rect } from 'react-native-svg';
@@ -15,7 +16,7 @@ import { useState } from 'react';
 
 const { width } = Dimensions.get('window');
 
-const AttendanceScreen = () => {
+const StudentAttendanceScreen = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('This Week');
 
   // Sample data
@@ -220,6 +221,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
+    paddingTop: StatusBar.currentHeight || 0,
   },
   header: {
     flexDirection: 'row',
@@ -456,4 +458,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AttendanceScreen;
+export default StudentAttendanceScreen;

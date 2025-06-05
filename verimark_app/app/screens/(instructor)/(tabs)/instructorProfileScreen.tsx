@@ -1,3 +1,6 @@
+
+
+
 import React from 'react';
 import {
   View,
@@ -10,11 +13,7 @@ import {
 import SummaryCard from '../../../../components/SummaryCard';
 import Header from '../../../../components/Header';
 
-interface ScreenProps {
-  title?: string; // Optional title fallback
-}
-
-const ProfileScreen: React.FC<ScreenProps> = ({ title }) => {
+const InstructorProfileScreen =() => {
   const name = "Michael Mitc";
   return (
 <View>
@@ -89,4 +88,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProfileScreen;
+export default InstructorProfileScreen;
