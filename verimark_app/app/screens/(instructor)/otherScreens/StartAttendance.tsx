@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import { router, useLocalSearchParams, useRouter } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useTheme } from '../../../../ThemeContext'; // <-- Import the theme context
 
 const hours = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const minutes = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
@@ -19,6 +20,7 @@ const ampm = ['AM', 'PM'];
 
 const StartAttendance = () => {
   const params = useLocalSearchParams();
+  const { theme } = useTheme(); // <-- Use the theme
 
   const selectedHall = params.selectedHall ? JSON.parse(params.selectedHall as string) : null;
   const selectedCourse = params.selectedCourse ? JSON.parse(params.selectedCourse as string) : null;
@@ -82,49 +84,72 @@ const StartAttendance = () => {
       );
       return;
     }
-    // You can use useRouter().push(...) here if you want to navigate
-    // For now, just show an alert or set a state
-    Alert.alert('Attendance Started', `Course: ${selectedCourse?.code} - ${selectedCourse?.title}\nHall: ${selectedHall?.name}\nTime: ${startTime} - ${endTime}`);
+    Alert.alert(
+      'Attendance Started',
+      `Course: ${selectedCourse?.code} - ${selectedCourse?.title}\nHall: ${selectedHall?.name}\nTime: ${startTime} - ${endTime}`,
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            router.push({
+              pathname: '/screens/(instructor)/otherScreens/ActiveAttendanceScreen',
+              params: {
+                selectedCourse: JSON.stringify(selectedCourse),
+                selectedHall: JSON.stringify(selectedHall),
+                startTime,
+                endTime,
+              },
+            });
+          },
+        },
+      ]
+    );
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Title */}
       <TouchableOpacity style={styles.backIcon} onPress={() => router.back()}>
-        <Ionicons name="chevron-back" size={24} color="#007AFF" />
+        <Ionicons name="chevron-back" size={24} color={theme.text} />
       </TouchableOpacity>
-      <Text style={styles.title}>Attendance Initiation</Text>
+      <Text style={[styles.title, { color: theme.text }]}>Attendance Initiation</Text>
 
       {/* Time Selection Section */}
       <View style={styles.timeSelectionContainer}>
-        <Text style={styles.sectionTitle}>Set Class Duration</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Set Class Duration</Text>
         {/* Start Time */}
         <View style={styles.timeInputContainer}>
-          <Text style={styles.timeLabel}>Start Time</Text>
-          <TouchableOpacity style={styles.timeButton} onPress={openStartTimePicker}>
-            <Text style={styles.timeButtonText}>{startTime}</Text>
-            <Ionicons name="chevron-down" size={20} color="#007AFF" />
+          <Text style={[styles.timeLabel, { color: theme.text }]}>Start Time</Text>
+          <TouchableOpacity
+            style={[styles.timeButton, { backgroundColor: theme.card, borderColor: theme.text + '22' }]}
+            onPress={openStartTimePicker}
+          >
+            <Text style={[styles.timeButtonText, { color: theme.text }]}>{startTime}</Text>
+            <Ionicons name="chevron-down" size={20} color={theme.text} />
           </TouchableOpacity>
         </View>
         {/* End Time */}
         <View style={styles.timeInputContainer}>
-          <Text style={styles.timeLabel}>End Time</Text>
-          <TouchableOpacity style={styles.timeButton} onPress={openEndTimePicker}>
-            <Text style={styles.timeButtonText}>{endTime}</Text>
-            <Ionicons name="chevron-down" size={20} color="#007AFF" />
+          <Text style={[styles.timeLabel, { color: theme.text }]}>End Time</Text>
+          <TouchableOpacity
+            style={[styles.timeButton, { backgroundColor: theme.card, borderColor: theme.text + '22' }]}
+            onPress={openEndTimePicker}
+          >
+            <Text style={[styles.timeButtonText, { color: theme.text }]}>{endTime}</Text>
+            <Ionicons name="chevron-down" size={20} color={theme.text} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Course Information Card */}
-      <View style={styles.courseCard}>
-        <Text style={styles.courseTitle}>
+      <View style={[styles.courseCard, { backgroundColor: theme.card, borderColor: theme.text + '22' }]}>
+        <Text style={[styles.courseTitle, { color: theme.text }]}>
           {selectedCourse?.code ?? 'No Code'} - {selectedCourse?.title ?? 'No Title'}
         </Text>
-        <Text style={styles.courseDetail}>
+        <Text style={[styles.courseDetail, { color: theme.text + '99' }]}>
           Hall: {selectedHall?.name ?? 'No Hall'}, {selectedHall?.description ?? ''}
         </Text>
-        <Text style={styles.courseDetail}>
+        <Text style={[styles.courseDetail, { color: theme.text + '99' }]}>
           Time: {startTime && endTime ? `${startTime} - ${endTime}` : 'Please set start and end time'}
         </Text>
       </View>
@@ -148,40 +173,43 @@ const StartAttendance = () => {
         onRequestClose={() => setShowStartTimePicker(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Start Time</Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Select Start Time</Text>
               <TouchableOpacity onPress={() => setShowStartTimePicker(false)}>
-                <Ionicons name="close" size={24} color="#666" />
+                <Ionicons name="close" size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
             <View style={styles.pickerRow}>
               <View style={styles.pickerColumn}>
-                <Text style={styles.pickerLabel}>Hour</Text>
+                <Text style={[styles.pickerLabel, { color: theme.text }]}>Hour</Text>
                 <Picker
                   selectedValue={tempStartHour}
                   style={styles.modalPicker}
                   onValueChange={setTempStartHour}
+                  itemStyle={{ fontSize: 28, color: theme.text }} // Increase font size
                 >
                   {hours.map(h => <Picker.Item key={h} label={h} value={h} />)}
                 </Picker>
               </View>
               <View style={styles.pickerColumn}>
-                <Text style={styles.pickerLabel}>Minute</Text>
+                <Text style={[styles.pickerLabel, { color: theme.text }]}>Minute</Text>
                 <Picker
                   selectedValue={tempStartMinute}
                   style={styles.modalPicker}
                   onValueChange={setTempStartMinute}
+                  itemStyle={{ fontSize: 28, color: theme.text }} // Increase font size
                 >
                   {minutes.map(m => <Picker.Item key={m} label={m} value={m} />)}
                 </Picker>
               </View>
               <View style={styles.pickerColumn}>
-                <Text style={styles.pickerLabel}>AM/PM</Text>
+                <Text style={[styles.pickerLabel, { color: theme.text }]}>AM/PM</Text>
                 <Picker
                   selectedValue={tempStartAMPM}
                   style={styles.modalPicker}
                   onValueChange={setTempStartAMPM}
+                  itemStyle={{ fontSize: 28, color: theme.text }} // Increase font size
                 >
                   {ampm.map(ap => <Picker.Item key={ap} label={ap} value={ap} />)}
                 </Picker>
@@ -202,40 +230,43 @@ const StartAttendance = () => {
         onRequestClose={() => setShowEndTimePicker(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select End Time</Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Select End Time</Text>
               <TouchableOpacity onPress={() => setShowEndTimePicker(false)}>
-                <Ionicons name="close" size={24} color="#666" />
+                <Ionicons name="close" size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
             <View style={styles.pickerRow}>
               <View style={styles.pickerColumn}>
-                <Text style={styles.pickerLabel}>Hour</Text>
+                <Text style={[styles.pickerLabel, { color: theme.text }]}>Hour</Text>
                 <Picker
                   selectedValue={tempEndHour}
                   style={styles.modalPicker}
                   onValueChange={setTempEndHour}
+                  itemStyle={{ fontSize: 28, color: theme.text }} // Increase font size
                 >
                   {hours.map(h => <Picker.Item key={h} label={h} value={h} />)}
                 </Picker>
               </View>
               <View style={styles.pickerColumn}>
-                <Text style={styles.pickerLabel}>Minute</Text>
+                <Text style={[styles.pickerLabel, { color: theme.text }]}>Minute</Text>
                 <Picker
                   selectedValue={tempEndMinute}
                   style={styles.modalPicker}
                   onValueChange={setTempEndMinute}
+                  itemStyle={{ fontSize: 28, color: theme.text }} // Increase font size
                 >
                   {minutes.map(m => <Picker.Item key={m} label={m} value={m} />)}
                 </Picker>
               </View>
               <View style={styles.pickerColumn}>
-                <Text style={styles.pickerLabel}>AM/PM</Text>
+                <Text style={[styles.pickerLabel, { color: theme.text }]}>AM/PM</Text>
                 <Picker
                   selectedValue={tempEndAMPM}
                   style={styles.modalPicker}
                   onValueChange={setTempEndAMPM}
+                  itemStyle={{ fontSize: 28, color: theme.text }} // Increase font size
                 >
                   {ampm.map(ap => <Picker.Item key={ap} label={ap} value={ap} />)}
                 </Picker>
@@ -254,7 +285,6 @@ const StartAttendance = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
     paddingHorizontal: 20,
     paddingTop: StatusBar.currentHeight || 0,
   },
@@ -267,7 +297,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#007AFF',
     textAlign: 'center',
     marginBottom: 30,
   },
@@ -277,7 +306,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 15,
   },
   timeInputContainer: {
@@ -286,7 +314,6 @@ const styles = StyleSheet.create({
   timeLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#666',
     marginBottom: 8,
   },
   timeButton: {
@@ -294,15 +321,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#F8F9FA',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
     borderWidth: 1,
-    borderColor: '#E9ECEF',
+    minWidth: 180, // Increased width for better visibility
+    marginBottom: 5,
   },
   timeButtonText: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: 18,
     fontWeight: '500',
   },
   modalOverlay: {
@@ -312,11 +339,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 20,
-    width: '90%',
-    maxWidth: 400,
+    width: '95%',
+    maxWidth: 420,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -327,7 +353,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
   },
   pickerRow: {
     flexDirection: 'row',
@@ -339,19 +364,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pickerLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
-    color: '#666',
     marginBottom: 8,
   },
   modalPicker: {
-    height: 150,
+    height: 180, // Increased height for better visibility
     width: '100%',
   },
   confirmButton: {
     backgroundColor: '#007AFF',
     borderRadius: 8,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: 'center',
   },
   confirmButtonText: {
@@ -360,9 +384,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   courseCard: {
-    backgroundColor: '#F8F9FA',
     borderWidth: 1,
-    borderColor: '#E9ECEF',
     borderRadius: 12,
     padding: 20,
     marginBottom: 20,
@@ -370,34 +392,12 @@ const styles = StyleSheet.create({
   courseTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 12,
     textAlign: 'center',
   },
   courseDetail: {
     fontSize: 14,
-    color: '#666',
     marginBottom: 8,
-    textAlign: 'center',
-  },
-  selectedInfoCard: {
-    backgroundColor: '#E9F7EF',
-    borderWidth: 1,
-    borderColor: '#D1E7DD',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 50,
-  },
-  selectedInfoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#155724',
-    marginBottom: 10,
-  },
-  selectedInfoText: {
-    fontSize: 14,
-    color: '#155724',
-    marginBottom: 5,
     textAlign: 'center',
   },
   startButton: {

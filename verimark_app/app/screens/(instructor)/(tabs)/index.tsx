@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import Header from '../../../../components/Header';
 import ClassCard from '../../../../components/ClassCard';
 import { router } from 'expo-router';
+import { useTheme } from '../../../../ThemeContext'; // <-- Import the theme context
 
 type InstructorHomeScreenProps = {
   title?: string;
@@ -11,30 +12,37 @@ type InstructorHomeScreenProps = {
 
 const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) => {
   const name = "Dr. Johnson";
-  
+  const { theme } = useTheme(); // <-- Use the theme
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Header name={name} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.headerContainer}>
-          <View style={styles.header}>
+          <View style={[styles.header, { backgroundColor: theme.card }]}>
             <View>
-              <Text style={styles.greeting}>{title ?? `Welcome ${name}`}</Text>
-              <Text style={styles.sub}>Manage classes, Track attendance</Text>
+              <Text style={[styles.greeting, { color: theme.text }]}>{title ?? `Welcome ${name}`}</Text>
+              <Text style={[styles.sub, { color: theme.text } ]}>Manage classes, Track attendance</Text>
             </View>
           </View>
 
           <View style={styles.grid}>
             <TouchableOpacity 
-              style={styles.box}
+              style={[styles.box, { backgroundColor: theme.card }]}
               onPress={() => router.push('/screens/(instructor)/(tabs)/instructorCourseScreen')}
             >
-              <Text style={styles.boxText}>Initiate a Class</Text>
+              <Text style={[styles.boxText, { color: theme.text }]}>Initiate a Class</Text>
             </TouchableOpacity> 
-            
+
+            <TouchableOpacity
+              style={[styles.box, { marginLeft: 10, backgroundColor: theme.card }]}
+              onPress={() => router.push('/screens/(instructor)/otherScreens/Report')}
+            >
+              <Text style={[styles.boxText, { color: theme.text }]}>Download Reports</Text>
+            </TouchableOpacity>
           </View>
 
-          <Text style={styles.sectionTitle}>My Classes</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>My Classes</Text>
 
           <ClassCard
             title="CEF331 Advanced Database"
@@ -51,7 +59,6 @@ const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) =>
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f6f8fa',
   },
   scrollContent: {
     flexGrow: 1,
@@ -60,18 +67,16 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   greeting: { 
-    color: '#fff', 
     fontSize: 18, 
     fontWeight: 'bold' 
   },
   sub: { 
-    color: '#d0e5ff' 
+    // color will be set by theme
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 20,
-    backgroundColor: '#4f9dfc',
     borderRadius: 5,
   },
   grid: {
@@ -80,10 +85,8 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   box: {
-    width: '100%',
-    backgroundColor: '#418EFB',
-    opacity:.2,
-    padding: 60,
+    flex: 1,
+    padding: 20,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -93,10 +96,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   boxText: {
-    color: '#000',
     fontWeight: 'bold',
     textAlign: 'center',
-    fontSize: 18,
+    fontSize: 15,
   },
   sectionTitle: {
     fontSize: 16,

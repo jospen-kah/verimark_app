@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTheme } from '../../../../ThemeContext'; // <-- Import the theme context
 
 const halls = [
   { id: 1, name: 'BGFL', description: 'FET Building, Ground Floor' },
@@ -19,6 +20,7 @@ const halls = [
 
 const HallSelectionScreen = () => {
   const params = useLocalSearchParams();
+  const { theme } = useTheme();
   const selectedCourse = params.selectedCourse ? JSON.parse(params.selectedCourse as string) : null;
 
   const handleHallSelect = (hall: { id: number; name: string; description: string }) => {
@@ -32,19 +34,19 @@ const HallSelectionScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Back Icon */}
       <TouchableOpacity style={styles.backIcon} onPress={() => router.back()}>
-        <Ionicons name="chevron-back" size={24} color="#007AFF" />
+        <Ionicons name="chevron-back" size={24} color={theme.text} />
       </TouchableOpacity>
 
       {/* Title */}
-      <Text style={styles.title}>Select Hall</Text>
+      <Text style={[styles.title, { color: theme.text }]}>Select Hall</Text>
 
       {/* Selected Course Info */}
       {selectedCourse && (
-        <View style={styles.selectedCourseContainer}>
-          <Text style={styles.selectedCourseText}>
+        <View style={[styles.selectedCourseContainer, { backgroundColor: theme.card }]}>
+          <Text style={[styles.selectedCourseText, { color: theme.text }]}>
             Selected Course: {selectedCourse.code} - {selectedCourse.title}
           </Text>
         </View>
@@ -55,13 +57,16 @@ const HallSelectionScreen = () => {
         {halls.map((hall) => (
           <TouchableOpacity
             key={hall.id}
-            style={styles.hallItem}
+            style={[
+              styles.hallItem,
+              { backgroundColor: theme.card, borderColor: theme.text + '22' },
+            ]}
             onPress={() => handleHallSelect(hall)}
             activeOpacity={0.7}
           >
             <View style={styles.hallInfo}>
-              <Text style={styles.hallName}>{hall.name}</Text>
-              <Text style={styles.hallDescription}>{hall.description}</Text>
+              <Text style={[styles.hallName, { color: theme.text }]}>{hall.name}</Text>
+              <Text style={[styles.hallDescription, { color: theme.text + '99' }]}>{hall.description}</Text>
             </View>
           </TouchableOpacity>
         ))}
@@ -73,7 +78,6 @@ const HallSelectionScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
     paddingHorizontal: 20,
     paddingTop: StatusBar.currentHeight || 0,
   },
@@ -86,12 +90,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#007AFF',
     textAlign: 'center',
     marginBottom: 15,
   },
   selectedCourseContainer: {
-    backgroundColor: '#E8F5E8',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 6,
@@ -100,20 +102,17 @@ const styles = StyleSheet.create({
   },
   selectedCourseText: {
     fontSize: 14,
-    color: '#4CAF50',
     fontWeight: '500',
   },
   hallsList: {
     flex: 1,
   },
   hallItem: {
-    backgroundColor: '#F8F9FA',
     paddingVertical: 16,
     paddingHorizontal: 16,
     marginBottom: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E9ECEF',
   },
   hallInfo: {
     flex: 1,
@@ -121,12 +120,10 @@ const styles = StyleSheet.create({
   hallName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 4,
   },
   hallDescription: {
     fontSize: 14,
-    color: '#666',
   },
 });
 

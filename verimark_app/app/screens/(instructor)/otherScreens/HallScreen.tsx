@@ -12,7 +12,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
+import { useTheme } from '../../../../ThemeContext'; // <-- Import the theme context
 
 type Hall = {
   id: number;
@@ -28,9 +29,8 @@ type RootStackParamList = {
 
 const SelectHallScreen = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'SelectHall'>>();
-  const params = useLocalSearchParams();
-  const selectedHall = params.selectedHall ? JSON.parse(params.selectedHall as string) : null;
   const [searchText, setSearchText] = useState('');
+  const { theme } = useTheme(); // <-- Use the theme
 
   const halls = [
     {
@@ -82,11 +82,8 @@ const SelectHallScreen = () => {
       Alert.alert('Hall In Use', 'This hall is currently in use and cannot be selected.');
       return;
     }
-    // Navigate to select course screen with selected hall data using expo-router
-    router.push({
-      pathname: '/screens/(instructor)/otherScreens/CourseSelection',
-      params: { selectedHall: JSON.stringify(hall) },
-    });
+    // Navigate to select course screen with selected hall data
+    navigation.replace('SelectCourse', { selectedHall: hall });
   };
 
   const filteredHalls = halls.filter(hall =>
@@ -94,22 +91,22 @@ const SelectHallScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Back Icon */}
       <TouchableOpacity style={styles.backIcon} onPress={() => navigation.goBack()}>
-        <Ionicons name="chevron-back" size={24} color="#007AFF" />
+        <Ionicons name="chevron-back" size={24} color={theme.text} />
       </TouchableOpacity>
 
       {/* Title */}
-      <Text style={styles.title}>Select Hall</Text>
+      <Text style={[styles.title, { color: theme.text }]}>Select Hall</Text>
 
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+      <View style={[styles.searchContainer, { backgroundColor: theme.card }]}>
+        <Ionicons name="search" size={20} color={theme.text + '99'} style={styles.searchIcon} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: theme.text }]}
           placeholder="Search hall by name"
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.text + '99'}
           value={searchText}
           onChangeText={setSearchText}
         />
@@ -120,20 +117,24 @@ const SelectHallScreen = () => {
         {filteredHalls.map((hall) => (
           <TouchableOpacity
             key={hall.id}
-            style={styles.hallItem}
+            style={[
+              styles.hallItem,
+              {
+                backgroundColor: theme.card,
+                borderColor: hall.status === 'Available' ? '#4CAF50' : '#FF3B30',
+              },
+            ]}
             onPress={() => handleHallSelect(hall)}
             activeOpacity={0.7}
           >
             <View style={styles.hallInfo}>
-              <Text style={styles.hallName}>{hall.name}</Text>
-              <Text style={styles.hallDescription}>{hall.description}</Text>
+              <Text style={[styles.hallName, { color: theme.text }]}>{hall.name}</Text>
+              <Text style={[styles.hallDescription, { color: theme.text + '99' }]}>{hall.description}</Text>
             </View>
             <Text
               style={[
                 styles.hallStatus,
-                {
-                  color: hall.status === 'Available' ? '#4CAF50' : '#FF3B30',
-                },
+                { color: hall.status === 'Available' ? '#4CAF50' : '#FF3B30' },
               ]}
             >
               {hall.status}
@@ -148,7 +149,6 @@ const SelectHallScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
     paddingHorizontal: 20,
     paddingTop: StatusBar.currentHeight || 0,
   },
@@ -161,14 +161,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#007AFF',
     textAlign: 'center',
     marginBottom: 20,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -180,7 +178,6 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
   },
   hallsList: {
     flex: 1,
@@ -189,13 +186,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
     paddingVertical: 16,
     paddingHorizontal: 16,
     marginBottom: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E9ECEF',
   },
   hallInfo: {
     flex: 1,
@@ -203,12 +198,10 @@ const styles = StyleSheet.create({
   hallName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 4,
   },
   hallDescription: {
     fontSize: 14,
-    color: '#666',
   },
   hallStatus: {
     fontSize: 14,

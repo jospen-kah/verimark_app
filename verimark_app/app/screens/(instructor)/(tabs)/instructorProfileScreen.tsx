@@ -1,6 +1,3 @@
-
-
-
 import React from 'react';
 import {
   View,
@@ -12,33 +9,38 @@ import {
 } from 'react-native';
 import SummaryCard from '../../../../components/SummaryCard';
 import Header from '../../../../components/Header';
+import { router } from 'expo-router';
+import { useTheme } from '../../../../ThemeContext'; // <-- Import the theme context
 
-const InstructorProfileScreen =() => {
+const InstructorProfileScreen = () => {
   const name = "Michael Mitc";
+  const { theme } = useTheme();
+
   return (
-<View>
-    <Header name={name} />
-    <ScrollView contentContainerStyle={styles.container}>
-      <Image
-        source={require('../../../../assets/images/profile.jpg')}
-        style={styles.profileImage}
-      />
-      <Text style={styles.name}>Michael Mitc</Text>
-      <Text style={styles.info}>Matriculation: FE21A331</Text>
-      <Text style={styles.info}>Computer Engineering L500</Text>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <Header name={name} />
+      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.background }]}>
+        <Image
+          source={require('../../../../assets/images/profile.jpg')}
+          style={styles.profileImage}
+        />
+        <Text style={[styles.name, { color: theme.text }]}>Dr Johnson </Text>
+        <Text style={[styles.info, { color: theme.text + '99' }]}>Email: johnson@gmail.com</Text>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Attendance Summary</Text>
+        <View style={[styles.section, { backgroundColor: theme.card, borderRadius: 12 }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Attendance Summary</Text>
+          <SummaryCard label="Overall Attendance:" value="92%" valueColor="#2ECC71" />
+          <SummaryCard label="Classes this Semester:" value="35/40" />
+          <SummaryCard label="Late Check-ins:" value="3" valueColor="#E74C3C" />
+        </View>
 
-        <SummaryCard label="Overall Attendance:" value="92%" valueColor="#2ECC71" />
-        <SummaryCard label="Classes this Semester:" value="35/40" />
-        <SummaryCard label="Late Check-ins:" value="3" valueColor="#E74C3C" />
-      </View>
-
-      <TouchableOpacity style={styles.settingsButton}>
-        <Text style={styles.settingsText}>Settings</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity
+          style={[styles.settingsButton, { backgroundColor: theme.card }]}
+          onPress={() => router.push('/screens/(instructor)/otherScreens/InstructorSetting')}
+        >
+          <Text style={[styles.settingsText, { color: theme.text }]}>Settings</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 };
@@ -47,7 +49,6 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
     flexGrow: 1,
   },
   profileImage: {
@@ -63,12 +64,12 @@ const styles = StyleSheet.create({
   },
   info: {
     fontSize: 14,
-    color: '#777',
     marginTop: 2,
   },
   section: {
     width: '100%',
     marginTop: 20,
+    padding: 16,
   },
   sectionTitle: {
     fontSize: 18,
@@ -77,7 +78,6 @@ const styles = StyleSheet.create({
   },
   settingsButton: {
     marginTop: 24,
-    backgroundColor: '#D8D8D8',
     paddingVertical: 10,
     paddingHorizontal: 40,
     borderRadius: 8,

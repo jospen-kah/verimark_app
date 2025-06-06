@@ -9,19 +9,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { router } from 'expo-router';
+import { useTheme } from '../../../../ThemeContext'; // <-- Import the theme context
 
 const InstructorSettingsScreen = () => {
   const navigation = useNavigation();
+  const { theme } = useTheme();
 
   // Map option to route
   const settingsOptions = [
     {
       label: 'Profile Information',
-      route: '/screens/(instructor)/otherScreens/StudentEditProfile',
-    },
-    {
-      label: 'Update Face Data',
-      route: '/screens/student/otherScreens/StudentFaceRegistrationScreen',
+      route: '/screens/(instructor)/otherScreens/InstructorEditProfile',
     },
     {
       label: 'Notification Setting',
@@ -33,7 +31,7 @@ const InstructorSettingsScreen = () => {
     },
     {
       label: 'App Appearances',
-      route: '/screens/(instructor)/otherScreens/AppAppearances',
+      route: '/screens/(instructor)/otherScreens/AppAppearance',
     },
     {
       label: 'About',
@@ -51,25 +49,25 @@ const InstructorSettingsScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Back Icon */}
       <TouchableOpacity style={styles.backIcon} onPress={() => navigation.goBack()}>
-        <Ionicons name="chevron-back" size={24} color="#007AFF" />
+        <Ionicons name="chevron-back" size={24} color={theme.text} />
       </TouchableOpacity>
 
       {/* Title */}
-      <Text style={styles.title}>Settings</Text>
+      <Text style={[styles.title, { color: theme.text }]}>Settings</Text>
 
       {/* Settings Options */}
       <View style={styles.optionsContainer}>
         {settingsOptions.map((option, index) => (
           <TouchableOpacity
             key={index}
-            style={styles.optionButton}
+            style={[styles.optionButton, { backgroundColor: theme.card }]}
             onPress={() => handleOptionPress(option.route)}
             activeOpacity={0.7}
           >
-            <Text style={styles.optionText}>{option.label}</Text>
+            <Text style={[styles.optionText, { color: theme.text }]}>{option.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -90,7 +88,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: '#fff',
     paddingHorizontal: 20,
     paddingTop: StatusBar.currentHeight || 0,
   },
@@ -102,7 +99,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#007AFF',
     marginBottom: 40,
   },
   optionsContainer: {
@@ -110,7 +106,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   optionButton: {
-    backgroundColor: '#E5E5E5',
     paddingVertical: 18,
     paddingHorizontal: 20,
     marginBottom: 15,
@@ -120,7 +115,6 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333333',
   },
   logoutButton: {
     backgroundColor: '#FF3B30',

@@ -11,9 +11,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Header from '@/components/Header';
+import { useTheme } from '../../../../ThemeContext'; // <-- Import the theme context
 
 const InstructorCourseScreen = () => {
   const [searchText, setSearchText] = useState('');
+  const { theme } = useTheme(); // <-- Use the theme
 
   const courses = [
     { id: 1, code: 'CEF331', title: 'Advanced Database', department: 'Computer Engineering' },
@@ -48,42 +50,44 @@ const InstructorCourseScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Header name="Instructor" />
 
       {/* Title */}
-      <Text style={styles.title}>Select Course</Text>
+      <View style={styles.subcontainer}>
+        <Text style={[styles.title, { color: theme.text }]}>Select Course</Text>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search course by code or title"
-          placeholderTextColor="#999"
-          value={searchText}
-          onChangeText={setSearchText}
-        />
+        {/* Search Bar */}
+        <View style={[styles.searchContainer, { backgroundColor: theme.card }]}>
+          <Ionicons name="search" size={20} color={theme.text} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchInput, { color: theme.text }]}
+            placeholder="Search course by code or title"
+            placeholderTextColor={theme.text + '99'}
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+        </View>
+
+        {/* Courses List */}
+        <ScrollView style={styles.coursesList} showsVerticalScrollIndicator={false}>
+          {filteredCourses.map((course) => (
+            <TouchableOpacity
+              key={course.id}
+              style={[styles.courseItem, { backgroundColor: theme.card, borderColor: theme.text + '22' }]}
+              onPress={() => handleCourseSelect(course)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.courseInfo}>
+                <Text style={[styles.courseCodeTitle, { color: theme.text }]}>
+                  {course.code} {course.title}
+                </Text>
+                <Text style={[styles.courseDepartment, { color: theme.text + '99' }]}>{course.department}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
-
-      {/* Courses List */}
-      <ScrollView style={styles.coursesList} showsVerticalScrollIndicator={false}>
-        {filteredCourses.map((course) => (
-          <TouchableOpacity
-            key={course.id}
-            style={styles.courseItem}
-            onPress={() => handleCourseSelect(course)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.courseInfo}>
-              <Text style={styles.courseCodeTitle}>
-                {course.code} {course.title}
-              </Text>
-              <Text style={styles.courseDepartment}>{course.department}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
     </View>
   );
 };
@@ -91,9 +95,7 @@ const InstructorCourseScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    // paddingTop: StatusBar.currentHeight || 0,
+    
   },
   backIcon: {
     position: 'absolute',
@@ -101,17 +103,21 @@ const styles = StyleSheet.create({
     paddingTop: StatusBar.currentHeight || 0,
     zIndex: 1,
   },
+  subcontainer: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingTop: StatusBar.currentHeight || 40,
+    paddingBottom: 20,
+  },
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#007AFF',
     textAlign: 'center',
     marginBottom: 15,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -123,19 +129,16 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
   },
   coursesList: {
     flex: 1,
   },
   courseItem: {
-    backgroundColor: '#F8F9FA',
     paddingVertical: 16,
     paddingHorizontal: 16,
     marginBottom: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E9ECEF',
   },
   courseInfo: {
     flex: 1,
@@ -143,12 +146,10 @@ const styles = StyleSheet.create({
   courseCodeTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 4,
   },
   courseDepartment: {
     fontSize: 14,
-    color: '#666',
   },
 });
 
