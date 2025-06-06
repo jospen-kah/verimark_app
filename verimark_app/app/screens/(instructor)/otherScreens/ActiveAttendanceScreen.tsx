@@ -180,10 +180,18 @@ const ActiveAttendanceScreen = () => {
         </View>
       </View>
 
-      {/* End Session Button */}
-      <TouchableOpacity style={styles.endSessionButton} onPress={handleEndSession}>
-        <Text style={styles.endSessionButtonText}>End Session</Text>
-      </TouchableOpacity>
+      {/* End Session & Return Home Buttons */}
+      <View style={styles.buttonRow}>
+        <TouchableOpacity style={styles.endSessionButton} onPress={handleEndSession}>
+          <Text style={styles.endSessionButtonText}>End Session</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.homeButton}
+          onPress={() => router.replace('/screens/(instructor)/(tabs)')}
+        >
+          <Text style={styles.homeButtonText}>Return to Home</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -291,15 +299,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8E8E93', // will be overridden by theme
   },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginHorizontal: 40,
+    marginBottom: 10,
+  },
   endSessionButton: {
     backgroundColor: '#FF3B30',
-    marginHorizontal: 40,
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',
-    marginBottom: 10,
+    flex: 1,
+    marginRight: 8,
   },
   endSessionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  homeButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    flex: 1,
+    marginLeft: 8,
+  },
+  homeButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',

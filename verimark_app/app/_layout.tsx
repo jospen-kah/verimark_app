@@ -2,30 +2,35 @@ import { StyleSheet, Text, View } from 'react-native'
 import React from 'react'
 import { Stack } from 'expo-router'
 import { ThemeProvider } from '../ThemeContext'; // adjust path if needed
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from '../context/AuthContext'; // <-- import AuthProvider
+
+const queryClient = new QueryClient();
 
 const RootLayout = () => {
   return (
-    <ThemeProvider>
-      <Stack screenOptions={{headerShown: false}}>
-        <Stack.Screen
-          name="index"
-          
-        />
-        <Stack.Screen
-          name="auth/LoginScreen"
-          
-        />
-        <Stack.Screen
-          name="screens/student/StudentHomeScreen"
-        
-        />
-        <Stack.Screen
-          name="screens/(instructor)"/>
-     
-      
-      </Stack>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ThemeProvider>
+          <Stack screenOptions={{headerShown: false}}>
+            <Stack.Screen
+              name="index"
+            />
+            <Stack.Screen
+              name="auth/LoginScreen"
+            />
+            <Stack.Screen
+              name="screens/student/StudentHomeScreen"
+            />
+            <Stack.Screen
+              name="screens/(instructor)"/>
+          </Stack>
+        </ThemeProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 
 export default RootLayout
+
+const styles = StyleSheet.create({})

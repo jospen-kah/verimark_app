@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import axios from 'axios';
+import { useMutation } from '@tanstack/react-query';
+import { registerUser } from '../../APIs/authApi'; // Adjust path as needed
 
 const { width } = Dimensions.get('window');
 
@@ -37,6 +38,35 @@ export default function RegisterScreen() {
 
   const roles = ['Instructor', 'Student'];
 
+  const mutation = useMutation({
+    mutationFn: registerUser,
+    onSuccess: (data) => {
+      Alert.alert('Email Sent', 'Verification email sent! Please check your inbox.', [
+        {
+          text: 'OK',
+          onPress: () => router.push({
+            pathname: '/auth/VerifyEmailScreen',
+            params: { email: formData.email },
+          }),
+        },
+      ]);
+    },
+    onError: (error: any) => {
+      console.log('Registration error:', error.response?.data);
+      const backendMsg = error.response?.data?.message;
+      if (backendMsg === "User already exists.") {
+        Alert.alert('User Exists', 'Account already exists. Redirecting to login...', [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/auth/LoginScreen'),
+          },
+        ]);
+      } else {
+        Alert.alert('Error', backendMsg || 'Registration failed');
+      }
+    },
+  });
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -44,7 +74,7 @@ export default function RegisterScreen() {
     }));
   };
 
-  const handleRegister = async () => {
+  const handleRegister = () => {
     if (!agreedToTerms) {
       Alert.alert('Error', 'Please agree to the Terms & Conditions and Privacy Policy');
       return;
@@ -60,43 +90,7 @@ export default function RegisterScreen() {
       return;
     }
 
-    setLoading(true);
-    try {
-      await axios.post('http://192.168.1.116:3000/api/auth/register', {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        password: formData.password,
-        confirmPassword: formData.confirmPassword,
-        role: formData.selectRole.toLowerCase(),
-        ...(formData.selectRole === 'Student' && { matricule: formData.matricule }),
-        matriNumber: formData.matricule,
-      });
-
-      Alert.alert('Email Sent', 'Verification email sent! Please check your inbox.', [
-        {
-          text: 'OK',
-          onPress: () => router.push({
-            pathname: '/auth/VerifyEmailScreen',
-            params: { email: formData.email },
-          }),
-        },
-      ]);
-    } catch (error: any) {
-      const backendMsg = error.response?.data?.message;
-      if (backendMsg === "User already exists.") {
-        Alert.alert('User Exists', 'Account already exists. Redirecting to login...', [
-          {
-            text: 'OK',
-            onPress: () => router.replace('/auth/LoginScreen'),
-          },
-        ]);
-      } else {
-        Alert.alert('Error', backendMsg || 'Registration failed');
-      }
-    } finally {
-      setLoading(false);
-    }
+    mutation.mutate(formData);
   };
 
   const handleGoogleSignIn = () => {
@@ -238,8 +232,8 @@ export default function RegisterScreen() {
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.registerButton} onPress={handleRegister} disabled={loading}>
-            {loading ? (
+          <TouchableOpacity style={styles.registerButton} onPress={handleRegister} disabled={mutation.isPending}>
+            {mutation.isPending ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.registerButtonText}>Register</Text>

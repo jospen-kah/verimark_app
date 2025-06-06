@@ -6,24 +6,32 @@ import {
   TouchableOpacity,
   StatusBar,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useTheme } from '../../../../ThemeContext'; // <-- Import the theme context
+import { useTheme } from '../../../../ThemeContext';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 
-const halls = [
-  { id: 1, name: 'BGFL', description: 'FET Building, Ground Floor' },
-  { id: 2, name: 'LT1', description: 'Lecture Theatre 1' },
-  { id: 3, name: 'LT2', description: 'Lecture Theatre 2' },
-  { id: 4, name: 'ENGHALL', description: 'Engineering Main Hall' },
-];
+// Fetch all halls from backend
+const fetchAllHalls = async () => {
+  const res = await axios.get('http://192.168.1.187:3000/api/halls/');
+  return res.data; // Should be an array of all halls
+};
 
 const HallSelectionScreen = () => {
   const params = useLocalSearchParams();
   const { theme } = useTheme();
   const selectedCourse = params.selectedCourse ? JSON.parse(params.selectedCourse as string) : null;
 
-  const handleHallSelect = (hall: { id: number; name: string; description: string }) => {
+  // Fetch halls using react-query
+  const { data: halls, isLoading, error } = useQuery({
+    queryKey: ['allHalls'],
+    queryFn: fetchAllHalls,
+  });
+
+  const handleHallSelect = (hall: any) => {
     router.push({
       pathname: '/screens/(instructor)/otherScreens/StartAttendance',
       params: {
@@ -53,24 +61,40 @@ const HallSelectionScreen = () => {
       )}
 
       {/* Halls List */}
-      <ScrollView style={styles.hallsList} showsVerticalScrollIndicator={false}>
-        {halls.map((hall) => (
-          <TouchableOpacity
-            key={hall.id}
-            style={[
-              styles.hallItem,
-              { backgroundColor: theme.card, borderColor: theme.text + '22' },
-            ]}
-            onPress={() => handleHallSelect(hall)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.hallInfo}>
-              <Text style={[styles.hallName, { color: theme.text }]}>{hall.name}</Text>
-              <Text style={[styles.hallDescription, { color: theme.text + '99' }]}>{hall.description}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {isLoading ? (
+        <ActivityIndicator color={theme.text} style={{ marginTop: 30 }} />
+      ) : error ? (
+        <Text style={{ color: 'red', textAlign: 'center', marginTop: 30 }}>
+          Failed to load halls.
+        </Text>
+      ) : (
+        <ScrollView style={styles.hallsList} showsVerticalScrollIndicator={false}>
+          {Array.isArray(halls) && halls.length > 0 ? (
+            halls.map((hall) => (
+              <TouchableOpacity
+                key={hall._id}
+                style={[
+                  styles.hallItem,
+                  { backgroundColor: theme.card, borderColor: theme.text + '22' },
+                ]}
+                onPress={() => handleHallSelect(hall)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.hallInfo}>
+                  <Text style={[styles.hallName, { color: theme.text }]}>{hall.name}</Text>
+                  <Text style={[styles.hallDescription, { color: theme.text + '99' }]}>
+                    Floor: {hall.floor}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Text style={{ color: theme.text, textAlign: 'center', marginTop: 30 }}>
+              No halls found.
+            </Text>
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 };

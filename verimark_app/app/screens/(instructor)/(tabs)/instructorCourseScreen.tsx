@@ -7,34 +7,40 @@ import {
   StatusBar,
   TextInput,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Header from '@/components/Header';
-import { useTheme } from '../../../../ThemeContext'; // <-- Import the theme context
+import { useTheme } from '../../../../ThemeContext';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+
+type Course = {
+  _id: string;
+  code: string;
+  title: string;
+  department: string;
+};
+
+// Fetch all courses with no restriction
+const fetchAllCourses = async () => {
+  const res = await axios.get('http://192.168.1.187:3000/api/courses');
+  return res.data; // Should be an array of all courses
+};
 
 const InstructorCourseScreen = () => {
   const [searchText, setSearchText] = useState('');
-  const { theme } = useTheme(); // <-- Use the theme
+  const { theme } = useTheme();
 
-  const courses = [
-    { id: 1, code: 'CEF331', title: 'Advanced Database', department: 'Computer Engineering' },
-    { id: 2, code: 'CSC301', title: 'Data Structures and Algorithms', department: 'Computer Science' },
-    { id: 3, code: 'EEE205', title: 'Circuit Analysis', department: 'Electrical Engineering' },
-    { id: 4, code: 'MEE401', title: 'Thermodynamics', department: 'Mechanical Engineering' },
-    { id: 5, code: 'CSC402', title: 'Software Engineering', department: 'Computer Science' },
-    { id: 6, code: 'CEF201', title: 'Digital Logic Design', department: 'Computer Engineering' },
-    { id: 7, code: 'MTH301', title: 'Calculus III', department: 'Mathematics' },
-    { id: 8, code: 'PHY201', title: 'Physics II', department: 'Physics' },
-  ];
-
-  type Course = {
-    id: number;
-    code: string;
-    title: string;
-    department: string;
-  };
-
+  const { data: courses, isLoading, error } = useQuery({
+    queryKey: ['allCourses'],
+    queryFn: fetchAllCourses,
+  });
+  // Log the fetched courses for debugging
+  if (courses) {
+    console.log('Fetched courses:', courses);
+  }
   const handleCourseSelect = (course: Course) => {
     router.push({
       pathname: '/screens/(instructor)/otherScreens/HallSelection',
@@ -44,20 +50,20 @@ const InstructorCourseScreen = () => {
     });
   };
 
-  const filteredCourses = courses.filter(course =>
-    course.code.toLowerCase().includes(searchText.toLowerCase()) ||
-    course.title.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const filteredCourses = Array.isArray(courses)
+    ? courses.filter(course =>
+        course.code.toLowerCase().includes(searchText.toLowerCase()) ||
+        course.title.toLowerCase().includes(searchText.toLowerCase())
+      )
+    : [];
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Header name="Instructor" />
 
-      {/* Title */}
       <View style={styles.subcontainer}>
         <Text style={[styles.title, { color: theme.text }]}>Select Course</Text>
 
-        {/* Search Bar */}
         <View style={[styles.searchContainer, { backgroundColor: theme.card }]}>
           <Ionicons name="search" size={20} color={theme.text} style={styles.searchIcon} />
           <TextInput
@@ -69,24 +75,35 @@ const InstructorCourseScreen = () => {
           />
         </View>
 
-        {/* Courses List */}
-        <ScrollView style={styles.coursesList} showsVerticalScrollIndicator={false}>
-          {filteredCourses.map((course) => (
-            <TouchableOpacity
-              key={course.id}
-              style={[styles.courseItem, { backgroundColor: theme.card, borderColor: theme.text + '22' }]}
-              onPress={() => handleCourseSelect(course)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.courseInfo}>
-                <Text style={[styles.courseCodeTitle, { color: theme.text }]}>
-                  {course.code} {course.title}
-                </Text>
-                <Text style={[styles.courseDepartment, { color: theme.text + '99' }]}>{course.department}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {isLoading ? (
+          <ActivityIndicator color={theme.text} style={{ marginTop: 30 }} />
+        ) : error ? (
+          <Text style={{ color: 'red', textAlign: 'center', marginTop: 30 }}>Failed to load courses.</Text>
+        ) : (
+          <ScrollView style={styles.coursesList} showsVerticalScrollIndicator={false}>
+            {filteredCourses.length > 0 ? (
+              filteredCourses.map((course) => (
+                <TouchableOpacity
+                  key={course._id}
+                  style={[styles.courseItem, { backgroundColor: theme.card, borderColor: theme.text + '22' }]}
+                  onPress={() => handleCourseSelect(course)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.courseInfo}>
+                    <Text style={[styles.courseCodeTitle, { color: theme.text }]}>
+                      {course.code} - {course.title}
+                    </Text>
+                    
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={{ color: theme.text, textAlign: 'center', marginTop: 30 }}>
+                No courses found.
+              </Text>
+            )}
+          </ScrollView>
+        )}
       </View>
     </View>
   );
@@ -95,7 +112,6 @@ const InstructorCourseScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    
   },
   backIcon: {
     position: 'absolute',
@@ -148,8 +164,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 4,
   },
-  courseDepartment: {
+  courseInstructor: {
     fontSize: 14,
+    marginTop: 2,
   },
 });
 

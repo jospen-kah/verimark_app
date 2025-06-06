@@ -10,12 +10,24 @@ import {
   Image,
   Alert,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, AntDesign } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
 
 const { width } = Dimensions.get('window');
+
+// API function for login
+const loginUser = async (formData: { email: string; password: string }) => {
+  const res = await axios.post('http://192.168.1.187:3000/api/auth/login', {
+    email: formData.email,
+    password: formData.password,
+  });
+  return res.data;
+};
 
 export default function LoginScreen() {
   const [formData, setFormData] = useState({
@@ -25,6 +37,26 @@ export default function LoginScreen() {
 
   const [showPassword, setShowPassword] = useState(false);
 
+  const mutation = useMutation({
+    mutationFn: loginUser,
+    onSuccess: async (data) => {
+      const user = data.user;
+      if (user && user._id) {
+        await SecureStore.setItemAsync('userId', user._id); // Save userId
+      }
+      if (user.role === 'student') {
+        router.replace('/screens/student/(tabs)');
+      } else if (user.role === 'instructor') {
+        router.replace('/screens/(instructor)/(tabs)');
+      } else {
+        Alert.alert('Error', 'Unknown user role');
+      }
+    },
+    onError: (error: any) => {
+      Alert.alert('Login Failed', error.response?.data?.message || 'Invalid credentials');
+    },
+  });
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -32,29 +64,12 @@ export default function LoginScreen() {
     }));
   };
 
-  const handleLogin = async () => {
+  const handleLogin = () => {
     if (!formData.email || !formData.password) {
       Alert.alert('Error', 'Email and password are required');
       return;
     }
-
-    try {
-      const response = await axios.post('http://192.168.1.116:3000/api/auth/login', {
-        email: formData.email,
-        password: formData.password,
-      });
-
-      const user = response.data.user;
-      if (user.role === 'student') {
-        router.replace('/screens/student');
-      } else if (user.role === 'instructor') {
-        router.replace('/screens');
-      } else {
-        Alert.alert('Error', 'Unknown user role');
-      }
-    } catch (error: any) {
-      Alert.alert('Login Failed', error.response?.data?.message || 'Invalid credentials');
-    }
+    mutation.mutate(formData);
   };
 
   const handleGoogleSignIn = () => {
@@ -110,8 +125,12 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           {/* Login Button */}
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-            <Text style={styles.loginButtonText}>Login</Text>
+          <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={mutation.isPending}>
+            {mutation.isPending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.loginButtonText}>Login</Text>
+            )}
           </TouchableOpacity>
 
           {/* Divider */}

@@ -7,6 +7,7 @@ import {
   StyleSheet,
   SafeAreaView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -16,6 +17,7 @@ const VerifyEmailScreen = () => {
   const params = useLocalSearchParams();
   const email = params.email as string;
   const [code, setCode] = useState(['', '', '', '']);
+  const [loading, setLoading] = useState(false);
 
   const handleCodeChange = (value: string, index: number) => {
     const newCode = [...code];
@@ -29,11 +31,13 @@ const VerifyEmailScreen = () => {
       Alert.alert('Error', 'Please enter the complete verification code');
       return;
     }
+    setLoading(true);
     try {
-      const response = await axios.post('http://192.168.1.116:3000/api/auth/verify-email', {
+      const response = await axios.post('http://192.168.1.221:3000/api/auth/verify-email', {
         email,
         code: verificationCode,
       });
+      setLoading(false);
       if (response.data?.token) {
         Alert.alert('Success', 'Email verified successfully!', [
           {
@@ -45,6 +49,7 @@ const VerifyEmailScreen = () => {
         Alert.alert('Error', response.data?.message || 'Invalid code');
       }
     } catch (error: any) {
+      setLoading(false);
       Alert.alert('Error', error.response?.data?.message || 'Verification failed');
     }
   };
@@ -94,8 +99,12 @@ const VerifyEmailScreen = () => {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.sendButton} onPress={handleVerify}>
-          <Text style={styles.sendButtonText}>Send</Text>
+        <TouchableOpacity style={styles.sendButton} onPress={handleVerify} disabled={loading}>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.sendButtonText}>Send</Text>
+          )}
         </TouchableOpacity>
 
         <Text style={styles.orText}>Or continue with social account</Text>
