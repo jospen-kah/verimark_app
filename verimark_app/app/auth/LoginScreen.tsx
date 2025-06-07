@@ -41,9 +41,16 @@ export default function LoginScreen() {
     mutationFn: loginUser,
     onSuccess: async (data) => {
       const user = data.user;
+      const token = data.token; // Make sure your backend returns the token here
+
+      // Store userId and token securely
       if (user && user._id) {
-        await SecureStore.setItemAsync('userId', user._id); // Save userId
+        await SecureStore.setItemAsync('userId', user._id);
       }
+      if (token) {
+        await SecureStore.setItemAsync('token', token);
+      }
+
       if (user.role === 'student') {
         router.replace('/screens/student/(tabs)');
       } else if (user.role === 'instructor') {

@@ -10,10 +10,20 @@ router.post(
   attendanceController.initiateAttendance
 );
 
+router.post(
+  '/end-session',
+  protect,
+  restrictTo('instructor'),  // <-- corrected function name here
+  attendanceController.endSession
+);
+
+
 router.post('/check-in', 
   protect, 
   restrictTo('student'), 
   attendanceController.checkIn);
+
+
 
 router.get('/attendance/summary/:attendanceId/:studentId',
   protect, 
@@ -30,6 +40,12 @@ router.get('/open-sessions',
   restrictTo('student'),
    attendanceController.getOpenAttendances);
 
+router.get(
+  '/instructor-sessions',
+  protect,
+  restrictTo('instructor'),
+  attendanceController.getInstructorAttendances
+);
 
 
 module.exports = router;

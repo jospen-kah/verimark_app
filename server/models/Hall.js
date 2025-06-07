@@ -3,6 +3,7 @@ const { Schema } = mongoose;
 
 const hallSchema = new Schema({
   name: { type: String, required: true },
+  floor: { type: String, required: true }, // Added floor property
   coordinates: [
     {
       latitude: Number,

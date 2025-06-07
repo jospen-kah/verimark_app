@@ -6,4 +6,7 @@ const { protect, restrictTo } = require('../middlewares/authMiddleware');
 
 router.post('/create', protect, restrictTo('admin'), hallController.createHall);
 
-module.exports = router
+router.get('/', hallController.getAllHalls);
+
+
+module.exports = router;

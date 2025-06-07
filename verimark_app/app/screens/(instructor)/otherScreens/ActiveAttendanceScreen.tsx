@@ -12,6 +12,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../../../ThemeContext';
+import * as SecureStore from 'expo-secure-store';
+import axios from 'axios';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 
 const ActiveAttendanceScreen = () => {
   const { theme } = useTheme();
@@ -25,6 +29,7 @@ const ActiveAttendanceScreen = () => {
   const [sessionActive, setSessionActive] = useState(true);
   const [remainingTime, setRemainingTime] = useState<string>('00 : 00 : 00');
   const [countdown, setCountdown] = useState<number>(0);
+  const [token, setToken] = useState<string | null>(null);
 
   // Sample data for checked-in students
   const [checkedInStudents] = useState([
@@ -120,6 +125,42 @@ const ActiveAttendanceScreen = () => {
     </View>
   );
 
+  // Get sessionId from params
+  const sessionId = params.sessionId as string;
+
+  // Mutation to end the session
+  const endSessionMutation = useMutation({
+    mutationFn: async () => {
+      const token = await SecureStore.getItemAsync('token');
+      const res = await axios.post(
+        'http://192.168.1.187:3000/api/attendance/end-session',
+        { attendanceId: sessionId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      return res.data;
+    },
+    onSuccess: () => {
+      setSessionActive(false);
+      setRemainingTime('00 : 00 : 00');
+      Alert.alert('Session Ended', 'The attendance session has ended.', [
+        {
+          text: 'OK',
+          onPress: () => router.back(),
+        },
+      ]);
+    },
+    onError: (error: any) => {
+      Alert.alert(
+        'Failed to End Session',
+        error?.response?.data?.message || 'An error occurred. Please try again.'
+      );
+    },
+  });
+
   const handleEndSession = () => {
     Alert.alert(
       'End Session',
@@ -130,19 +171,42 @@ const ActiveAttendanceScreen = () => {
           text: 'End Session',
           style: 'destructive',
           onPress: () => {
-            setSessionActive(false);
-            setRemainingTime('00 : 00 : 00');
-            Alert.alert('Session Ended', 'The attendance session has ended.', [
-              {
-                text: 'OK',
-                onPress: () => router.back(),
-              },
-            ]);
+            endSessionMutation.mutate();
           },
         },
       ]
     );
   };
+
+  // Fetch session status
+  const fetchSessionStatus = async (sessionId: string, token: string) => {
+    const res = await axios.get(
+      `http://192.168.1.187:3000/api/attendance/session-status/${sessionId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return res.data;
+  };
+
+  const { data: sessionData, refetch: refetchSession } = useQuery({
+    queryKey: ['sessionStatus', sessionId, token],
+    queryFn: () => fetchSessionStatus(sessionId, token!),
+    enabled: !!sessionId && !!token,
+    refetchInterval: 5000, // Optionally poll every 5 seconds for live updates
+  });
+
+  useEffect(() => {
+    SecureStore.getItemAsync('token').then(setToken);
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refetchSession();
+    }, [refetchSession])
+  );
 
   if (!sessionActive) {
     return null;
@@ -182,8 +246,17 @@ const ActiveAttendanceScreen = () => {
 
       {/* End Session & Return Home Buttons */}
       <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.endSessionButton} onPress={handleEndSession}>
-          <Text style={styles.endSessionButtonText}>End Session</Text>
+        <TouchableOpacity
+          style={[
+            styles.endSessionButton,
+            (sessionData?.status === 'closed' || !sessionActive) && { backgroundColor: '#8E8E93' },
+          ]}
+          onPress={handleEndSession}
+          disabled={sessionData?.status === 'closed' || !sessionActive}
+        >
+          <Text style={styles.endSessionButtonText}>
+            {sessionData?.status === 'closed' || !sessionActive ? 'Session Closed' : 'End Session'}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.homeButton}
@@ -240,6 +313,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff', // will be overridden by theme
+    paddingTop: StatusBar.currentHeight || 0,
   },
   header: {
     flexDirection: 'row',

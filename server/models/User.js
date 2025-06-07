@@ -13,20 +13,22 @@ const userSchema = new mongoose.Schema({
   },
 
   // Instructor-specific
+  title: { type: String, default: 'Mr' }, // Only for instructors, default is 'Mr'y for instructors, default is 'Mr'
   isApproved: { type: Boolean, default: false },
-  isApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Admin who approved
-  approvedDate: { type: Date },
+  isApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Admin who approvede.Schema.Types.ObjectId, ref: 'User' }, // Admin who approved
+  approvedDate: { type: Date },  approvedDate: { type: Date },
 
   // Student-specific
-  matriNumber: { type: String, unique: true, sparse: true }, // Optional, but required for students
-  faceData: { type: [Number], default: [] }, // e.g., Face embedding
-  faceImageUrl: { type: String }, // 🔹 URL/path to face image
+  matriNumber: { type: String, unique: true, sparse: true }, // Optional, but required for studentsonal, but required for students
+  faceData: { type: [Number], default: [] }, // e.g., Face embeddingedding
+  faceImageUrl: { type: String }, // 🔹 URL/path to face image  faceImageUrl: { type: String }, // 🔹 URL/path to face image
 
-  enrolledCourses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
+  enrolledCourses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],  enrolledCourses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
 
-  // For password reset with 4-digit code
+  // For password reset with 4-digit codeset with 4-digit code
   resetCode: String,
   resetCodeExpires: Date,
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);
+

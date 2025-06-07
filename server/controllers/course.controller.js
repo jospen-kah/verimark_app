@@ -62,3 +62,14 @@ exports.getCourse = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// @desc    Get all courses
+exports.getAllCourses = async (req, res) => {
+  try {
+    const courses = await Course.find()
+    //.populate('instructorId', 'name email');
+    res.status(200).json(courses);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

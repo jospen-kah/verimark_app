@@ -13,6 +13,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../../../ThemeContext'; // <-- Import the theme context
+import { useMutation } from '@tanstack/react-query';
+import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
+
 
 const hours = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const minutes = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
@@ -75,6 +79,64 @@ const StartAttendance = () => {
     setShowEndTimePicker(true);
   };
 
+  // Backend attendance initiation mutation
+  const initiateAttendance = async ({
+    courseId,
+    hallId,
+    startTime,
+    endTime,
+  }: {
+    courseId: string;
+    hallId: string;
+    startTime: string;
+    endTime: string;
+  }) => {
+    const token = await SecureStore.getItemAsync('token'); // Ensure you have the token stored
+    const res = await axios.post(
+      'http://192.168.1.187:3000/api/attendance/initiate',
+      { courseId, hallId, startTime, endTime },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return res.data;
+  };
+
+  const mutation = useMutation({
+    mutationFn: initiateAttendance,
+    onSuccess: (data) => {
+      Alert.alert(
+        'Attendance Started',
+        `Course: ${selectedCourse?.code} - ${selectedCourse?.title}\nHall: ${selectedHall?.name}\nTime: ${startTime} - ${endTime}`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              router.push({
+                pathname: '/screens/(instructor)/otherScreens/ActiveAttendanceScreen',
+                params: {
+                  selectedCourse: JSON.stringify(selectedCourse),
+                  selectedHall: JSON.stringify(selectedHall),
+                  startTime,
+                  endTime,
+                  sessionId: data.attendance?._id, // Pass session/attendance id if needed
+                },
+              });
+            },
+          },
+        ]
+      );
+    },
+    onError: (error: any) => {
+      Alert.alert(
+        'Failed to Start Attendance',
+        error?.response?.data?.message || 'An error occurred. Please try again.'
+      );
+    },
+  });
+
   const handleStartAttendance = () => {
     if (!startTime || !endTime) {
       Alert.alert(
@@ -84,26 +146,21 @@ const StartAttendance = () => {
       );
       return;
     }
-    Alert.alert(
-      'Attendance Started',
-      `Course: ${selectedCourse?.code} - ${selectedCourse?.title}\nHall: ${selectedHall?.name}\nTime: ${startTime} - ${endTime}`,
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            router.push({
-              pathname: '/screens/(instructor)/otherScreens/ActiveAttendanceScreen',
-              params: {
-                selectedCourse: JSON.stringify(selectedCourse),
-                selectedHall: JSON.stringify(selectedHall),
-                startTime,
-                endTime,
-              },
-            });
-          },
-        },
-      ]
-    );
+    if (!selectedCourse?._id || !selectedHall?._id) {
+      Alert.alert('Missing Data', 'Course or Hall information is missing.');
+      return;
+    }
+
+    // Convert to ISO strings
+    const startTimeISO = getISODateFromTime(startHour, startMinute, startAMPM);
+    const endTimeISO = getISODateFromTime(endHour, endMinute, endAMPM);
+
+    mutation.mutate({
+      courseId: selectedCourse._id,
+      hallId: selectedHall._id,
+      startTime: startTimeISO,
+      endTime: endTimeISO,
+    });
   };
 
   return (
@@ -148,6 +205,9 @@ const StartAttendance = () => {
         </Text>
         <Text style={[styles.courseDetail, { color: theme.text + '99' }]}>
           Hall: {selectedHall?.name ?? 'No Hall'}, {selectedHall?.description ?? ''}
+        </Text>
+        <Text style={[styles.courseDetail, { color: theme.text + '99' }]}>
+          Day: {getDayNameFromTime(startHour, startMinute, startAMPM)}
         </Text>
         <Text style={[styles.courseDetail, { color: theme.text + '99' }]}>
           Time: {startTime && endTime ? `${startTime} - ${endTime}` : 'Please set start and end time'}
@@ -281,6 +341,27 @@ const StartAttendance = () => {
     </View>
   );
 };
+
+function getISODateFromTime(hour: string, minute: string, ampm: string) {
+  // Get today's date
+  const today = new Date();
+  let h = parseInt(hour, 10);
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  // Set hours and minutes
+  today.setHours(h, parseInt(minute, 10), 0, 0);
+  return today.toISOString();
+}
+
+function getDayNameFromTime(hour: string, minute: string, ampm: string) {
+  const today = new Date();
+  let h = parseInt(hour, 10);
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  today.setHours(h, parseInt(minute, 10), 0, 0);
+  // Get the day name, e.g., "Monday"
+  return today.toLocaleDateString(undefined, { weekday: 'long' });
+}
 
 const styles = StyleSheet.create({
   container: {

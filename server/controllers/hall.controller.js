@@ -2,11 +2,12 @@ const Hall = require('../models/Hall');
 
 exports.createHall = async (req, res) => {
   try {
-    const { name, coordinates, minAltitude, maxAltitude } = req.body;
+    const { name, floor, coordinates, minAltitude, maxAltitude } = req.body;
 
     // Validate required fields
     if (
       !name ||
+      !floor ||
       !coordinates ||
       !Array.isArray(coordinates) ||
       coordinates.length === 0 ||
@@ -14,7 +15,7 @@ exports.createHall = async (req, res) => {
       typeof maxAltitude !== 'number'
     ) {
       return res.status(400).json({
-        message: 'Name, coordinates (array), minAltitude, and maxAltitude are required and must be valid.'
+        message: 'Name, floor, coordinates (array), minAltitude, and maxAltitude are required and must be valid.'
       });
     }
 
@@ -27,6 +28,7 @@ exports.createHall = async (req, res) => {
 
     const newHall = new Hall({
       name,
+      floor,
       coordinates,
       minAltitude,
       maxAltitude
@@ -35,6 +37,16 @@ exports.createHall = async (req, res) => {
     await newHall.save();
 
     res.status(201).json({ message: 'Hall created successfully', hall: newHall });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get all halls
+exports.getAllHalls = async (req, res) => {
+  try {
+    const halls = await Hall.find();
+    res.status(200).json(halls);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

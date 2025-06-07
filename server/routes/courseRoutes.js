@@ -3,7 +3,8 @@ const router = express.Router();
 const {
   createCourse,
   updateCourse,
-  getCourse
+  getCourse,
+  getAllCourses
 } = require('../controllers/course.controller');
 
 const { protect, restrictTo } = require('../middlewares/authMiddleware');
@@ -16,5 +17,8 @@ router.put('/:id/edit', protect, restrictTo('admin'), updateCourse);
 
 // Get course details
 router.get('/:id', protect, getCourse);
+
+// Get all courses
+router.get('/',  getAllCourses);
 
 module.exports = router;

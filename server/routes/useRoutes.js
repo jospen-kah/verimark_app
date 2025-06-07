@@ -20,4 +20,7 @@ router.put(
   userController.updateFaceProfile
 );
 
+// Get user by ID
+router.get('/:id', userController.getUser);
+
 module.exports = router;

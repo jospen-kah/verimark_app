@@ -19,9 +19,13 @@ const fetchInstructorProfile = async (instructorId: string) => {
   return res.data;
 };
 
-const fetchActiveSessions = async (instructorId: string) => {
-  const res = await axios.get(`http://192.168.1.187:3000/api/attendance/active?instructorId=${instructorId}`);
-  return res.data; // Should be an array of sessions
+// Fetch all sessions for instructor (open and closed)
+const fetchSessions = async () => {
+  const token = await SecureStore.getItemAsync('token');
+  const res = await axios.get('http://192.168.1.187:3000/api/attendance/instructor-sessions', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data; // Should be an array of sessions with status
 };
 
 const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) => {
@@ -44,9 +48,8 @@ const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) =>
 
   // Fetch active attendance sessions for this instructor
   const { data: sessions, isLoading: sessionsLoading } = useQuery({
-    queryKey: ['activeSessions', instructorId],
-    queryFn: () => fetchActiveSessions(instructorId as string),
-    enabled: !!instructorId,
+    queryKey: ['instructorSessions'],
+    queryFn: fetchSessions,
   });
 
   // Show loading spinner only while loading or waiting for instructorId
@@ -114,37 +117,36 @@ const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) =>
             </TouchableOpacity>
           </View>
 
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>My Active Sessions</Text>
-
-          {/* Render a ClassCard for each active session */}
-          {Array.isArray(sessions) && sessions.length > 0 ? (
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>My Sessions</Text>
+          {sessionsLoading ? (
+            <ActivityIndicator color={theme.text} />
+          ) : Array.isArray(sessions) && sessions.length > 0 ? (
             sessions.map((session: any) => (
               <TouchableOpacity
-                key={session._id}
+                key={session.attendanceId}
                 onPress={() =>
                   router.push({
                     pathname: '/screens/(instructor)/otherScreens/ActiveAttendanceScreen',
                     params: {
-                      sessionId: session._id,
-                      selectedCourse: JSON.stringify(session.course),
-                      selectedHall: JSON.stringify(session.hall),
+                      sessionId: session.attendanceId,
+                      selectedCourse: JSON.stringify({ code: session.courseCode, title: session.title }),
+                      selectedHall: JSON.stringify({ name: session.hallName }),
                       startTime: session.startTime,
-                      endTime: session.endTime,
                     },
                   })
                 }
               >
                 <ClassCard
-                  title={session.course?.name || 'Course'}
-                  time={`${session.startTime} - ${session.endTime}`}
-                  hall={session.hall?.name || 'Hall'}
-                  status={`Checked in: ${session.checkedInCount || 0}`}
+                  title={`${session.courseCode} - ${session.title}`}
+                  time={new Date(session.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  hall={session.hallName}
+                  status={session.status === 'open' ? 'Ongoing' : 'Over'}
                 />
               </TouchableOpacity>
             ))
           ) : (
             <Text style={{ color: theme.text, textAlign: 'center', marginTop: 10 }}>
-              No active sessions found.
+              No sessions found.
             </Text>
           )}
         </View>
