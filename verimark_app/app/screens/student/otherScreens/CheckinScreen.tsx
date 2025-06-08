@@ -1,59 +1,198 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   StatusBar,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { router } from 'expo-router';
+import * as Location from 'expo-location';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import axios from 'axios';
+
+const API_BASE_URL = 'http://192.168.1.187:3000/api'; // Your backend URL
 
 const CheckInScreen = () => {
   const navigation = useNavigation();
 
-  const handleCheckIn = () => {
-    console.log('Check In pressed');
-    // Add check-in logic here
+  const [permission, requestPermission] = useCameraPermissions();
+  const [hasLocationPermission, setHasLocationPermission] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('Waiting to start...');
+  const [loading, setLoading] = useState(false);
+  const [attendanceId, setAttendanceId] = useState<string | null>(null);
+  const [sessionInfo, setSessionInfo] = useState<{
+    courseCode: string;
+    courseName: string;
+    hallName: string;
+    startTime: string;
+  } | null>(null);
+
+  const cameraRef = useRef<CameraView>(null);
+
+  useEffect(() => {
+    (async () => {
+      // Request camera permission
+      if (!permission?.granted) {
+        await requestPermission();
+      }
+      // Request location permission
+      const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
+      setHasLocationPermission(locationStatus === 'granted');
+    })();
+  }, []);
+
+  // Fetch active attendance session on mount
+  useEffect(() => {
+    async function loadActiveSession() {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/open-sessions`, {
+          withCredentials: true,
+        });
+        if (response.data.length > 0) {
+          const session = response.data[0];
+          setAttendanceId(session.attendanceId);
+          setSessionInfo({
+            courseCode: session.courseCode,
+            courseName: session.courseName,
+            hallName: session.hallName,
+            startTime: session.startTime,
+          });
+        } else {
+          Alert.alert('No active attendance session found.');
+        }
+      } catch (error) {
+        Alert.alert('Failed to load attendance sessions.');
+      }
+    }
+    loadActiveSession();
+  }, []);
+
+  const handleCheckIn = async () => {
+    if (!attendanceId) {
+      Alert.alert('No active attendance session to check into.');
+      return;
+    }
+
+    setLoading(true);
+    setStatusMessage('Fetching location...');
+
+    try {
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      // 1. Verify geofence
+      setStatusMessage('Verifying location in geofence...');
+      const geoRes = await axios.post(
+        `${API_BASE_URL}/verify-geofence`,
+        {
+          latitude,
+          longitude,
+          attendanceId,
+        },
+        { withCredentials: true }
+      );
+
+      if (!geoRes.data.inside) {
+        Alert.alert('You are not inside the hall geofence.');
+        setLoading(false);
+        setStatusMessage('Waiting to start...');
+        return;
+      }
+
+      // 2. Take picture for face verification
+      setStatusMessage('Taking picture...');
+      if (!cameraRef.current) {
+        Alert.alert('Camera not available.');
+        setLoading(false);
+        setStatusMessage('Waiting to start...');
+        return;
+      }
+
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.5, base64: false });
+      if (!photo.uri) {
+        Alert.alert('Failed to take picture.');
+        setLoading(false);
+        setStatusMessage('Waiting to start...');
+        return;
+      }
+
+      // 3. Submit face image and attendanceId for check-in
+      setStatusMessage('Verifying face and checking in...');
+
+      const formData = new FormData();
+      formData.append('attendanceId', attendanceId);
+      formData.append('faceImage', {
+        uri: photo.uri,
+        name: 'face.jpg',
+        type: 'image/jpeg',
+      } as any);
+
+      const checkInRes = await axios.post(`${API_BASE_URL}/check-in`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        withCredentials: true,
+      });
+
+      if (checkInRes.status === 200) {
+        setStatusMessage('Check-in successful!');
+        Alert.alert('Success', 'You have checked in successfully.');
+      } else {
+        Alert.alert('Check-in failed', checkInRes.data.message || 'Unknown error');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Something went wrong.');
+      setStatusMessage('Error during check-in');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (!permission?.granted || !hasLocationPermission) {
+    return (
+      <View style={styles.container}>
+        <Text style={{ color: 'red', textAlign: 'center' }}>
+          Camera and Location permissions are required to check in.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* Back Icon */}
       <TouchableOpacity style={styles.backIcon} onPress={() => navigation.goBack()}>
         <Ionicons name="chevron-back" size={24} color="#007AFF" />
       </TouchableOpacity>
 
-      {/* Title */}
       <Text style={styles.title}>Class Check-in</Text>
 
-      {/* Class Info Card */}
-      <View style={styles.classCard}>
-        <Text style={styles.className}>CEF331 Advanced Database</Text>
-        <Text style={styles.classTime}>10:00AM-12:00AM</Text>
-        <Text style={styles.classLocation}>Hall BGFL</Text>
-        <Text style={styles.classStatus}>Ongoing</Text>
-      </View>
-
-      {/* Camera Circle */}
-      <View style={styles.cameraContainer}>
-        <View style={styles.cameraCircle}>
-          <View style={styles.innerCircle} />
+      {sessionInfo ? (
+        <View style={styles.classCard}>
+          <Text style={styles.className}>{sessionInfo.courseCode} {sessionInfo.courseName}</Text>
+          <Text style={styles.classTime}>{new Date(sessionInfo.startTime).toLocaleTimeString()}</Text>
+          <Text style={styles.classLocation}>{sessionInfo.hallName}</Text>
+          <Text style={styles.classStatus}>Ongoing</Text>
         </View>
+      ) : (
+        <Text style={{ marginBottom: 20 }}>Loading attendance session info...</Text>
+      )}
+
+      <View style={styles.cameraContainer}>
+        <CameraView ref={cameraRef} style={styles.camera} facing="front" />
       </View>
 
-      {/* Instructions */}
-      <Text style={styles.instruction}>Look at directly Camera</Text>
-      <Text style={styles.statusText}>Matching face...</Text>
+      <Text style={styles.instruction}>Look directly at the camera</Text>
+      <Text style={styles.statusText}>{statusMessage}</Text>
 
-      {/* Check In Button */}
       <TouchableOpacity
-        style={styles.checkInButton}
-        onPress={() => router.push('/screens/student/otherScreens/SuccessfulCheckin')}
+        style={[styles.checkInButton, loading && { backgroundColor: '#ccc' }]}
+        onPress={handleCheckIn}
         activeOpacity={0.8}
+        disabled={loading || !attendanceId}
       >
-        <Text style={styles.checkInText}>Check In</Text>
+        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.checkInText}>Check In</Text>}
       </TouchableOpacity>
     </View>
   );
@@ -71,6 +210,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 20,
     paddingTop: StatusBar.currentHeight || 0,
+    zIndex: 10,
   },
   title: {
     fontSize: 18,
@@ -85,7 +225,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     width: '100%',
-    marginBottom: 40,
+    marginBottom: 20,
   },
   className: {
     fontSize: 16,
@@ -109,23 +249,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   cameraContainer: {
-    marginBottom: 40,
-  },
-  cameraCircle: {
     width: 200,
     height: 200,
     borderRadius: 100,
+    overflow: 'hidden',
+    marginBottom: 40,
     borderWidth: 2,
     borderColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8F8F8',
   },
-  innerCircle: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: '#D3D3D3',
+  camera: {
+    flex: 1,
   },
   instruction: {
     fontSize: 16,
@@ -140,15 +273,14 @@ const styles = StyleSheet.create({
   },
   checkInButton: {
     backgroundColor: '#007AFF',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 40,
-    borderRadius: 25,
-    alignItems: 'center',
+    borderRadius: 30,
   },
   checkInText: {
+    color: '#fff',
+    fontWeight: '700',
     fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
   },
 });
 

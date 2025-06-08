@@ -33,7 +33,7 @@ const ActiveAttendanceScreen = () => {
 
   // Sample data for checked-in students
   const [checkedInStudents] = useState([
-    { id: '1', name: 'John Smith', studentId: 'ST001', checkInTime: '11:05 AM' },
+    // { id: '1', name: 'John Smith', studentId: 'ST001', checkInTime: '11:05 AM' },
     { id: '2', name: 'Emily Johnson', studentId: 'ST002', checkInTime: '11:08 AM' },
     { id: '3', name: 'Michael Brown', studentId: 'ST003', checkInTime: '11:12 AM' },
     { id: '4', name: 'Sarah Davis', studentId: 'ST004', checkInTime: '11:15 AM' },

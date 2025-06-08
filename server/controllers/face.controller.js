@@ -1,4 +1,6 @@
+const fs = require('fs'); 
 const { processAndEncodeFace, compareFace } = require('../services/face.service');
+const FaceData = require('../models/FaceData'); 
 
 function parseEmbedding(embedding) {
   if (typeof embedding === 'string') {
@@ -26,15 +28,26 @@ exports.registerFace = async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'No image uploaded' });
 
   try {
-    let embedding = await processAndEncodeFace(req.file.buffer);
-    embedding = parseEmbedding(embedding); // parse to real number array if needed
+  fs.writeFileSync('debug_upload_register.jpg', req.file.buffer);
 
-    req.user.faceData = embedding; // save to DB
-    await req.user.save();
+    const embedding = await processAndEncodeFace(req.file.buffer); // must return [Number]
+    if (!embedding || embedding.length === 0) {
+      return res.status(400).json({ message: 'No face detected' });
+    }
 
-    res.status(200).json({ message: 'Face registered successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    const parsedEmbedding = Array.from(embedding); // Ensure it's a plain array
+
+    // Save to DB
+    await FaceData.findOneAndUpdate(
+      { studentId: req.user._id },
+      { faceData: parsedEmbedding },
+      { upsert: true, new: true }
+    );
+
+    return res.status(200).json({ message: 'Face registered successfully' });
+  } catch (err) {
+    console.error('Face registration error:', err);
+    return res.status(500).json({ message: 'Failed to process face image' });
   }
 };
 

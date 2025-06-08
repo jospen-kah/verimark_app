@@ -40,6 +40,41 @@ exports.initiateAttendance = async (req, res) => {
   }
 };
 
+//verify it student is inside the hall geofence with altitude
+exports.verifyGeofence = async (req, res) => {
+  try {
+    const { latitude, longitude, attendanceId } = req.body;
+
+    if (!attendanceId) {
+      return res.status(400).json({ message: 'Attendance session ID is required' });
+    }
+
+    const session = await Attendance.findOne({ _id: attendanceId, status: 'open' }).populate('hallId');
+    if (!session) {
+      return res.status(404).json({ message: 'No active attendance session found' });
+    }
+
+    const hall = session.hallId;
+
+    // Get altitude from external API
+    const altitude = await getElevation(latitude, longitude);
+
+    // Check geofence with altitude
+    const isInside = isInsidePolygonWithAltitude(
+      { latitude, longitude, altitude },
+      hall.coordinates,
+      hall.minAltitude,
+      hall.maxAltitude
+    );
+
+    return res.status(200).json({ inside: isInside });
+  } catch (err) {
+    console.error('Verify geofence error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
 // Check-in controller
 exports.checkIn = async (req, res) => {
   try {
@@ -245,16 +280,18 @@ exports.getAttendanceSummary = async (req, res) => {
 exports.getOpenAttendances = async (req, res) => {
   try {
     const sessions = await Attendance.find({ status: 'open' })
-      .populate('courseId', 'code name')     // Only get code and name
+      .populate('courseId', 'code title')     // Only get code and name
       .populate('hallId', 'name');           // Only get hall name
 
     const formatted = sessions.map(session => ({
       attendanceId: session._id,
       courseCode: session.courseId.code,
-      courseName: session.courseId.name,
+      courseName: session.courseId.title,
       hallName: session.hallId.name,
-      startTime: session.startTime
+      startTime: session.startTime,
+      endTime: session.endTime,
     }));
+    console.log('Sessions fetched:', JSON.stringify(sessions, null, 2));
 
     res.status(200).json(formatted);
   } catch (err) {

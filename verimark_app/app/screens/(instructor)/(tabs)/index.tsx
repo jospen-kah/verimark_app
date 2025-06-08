@@ -1,13 +1,14 @@
-// screens/instructor/InstructorHomeScreen.tsx
-import React, { useEffect, useState } from 'react';
+ // screens/instructor/InstructorHomeScreen.tsx
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import Header from '../../../../components/Header';
 import ClassCard from '../../../../components/ClassCard';
 import { router } from 'expo-router';
 import { useTheme } from '../../../../ThemeContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import { useFocusEffect } from '@react-navigation/native';
 
 type InstructorHomeScreenProps = {
   title?: string;
@@ -19,17 +20,17 @@ const fetchInstructorProfile = async (instructorId: string) => {
   return res.data;
 };
 
-// Fetch all sessions for instructor (open and closed)
 const fetchSessions = async () => {
   const token = await SecureStore.getItemAsync('token');
   const res = await axios.get('http://192.168.1.187:3000/api/attendance/instructor-sessions', {
     headers: { Authorization: `Bearer ${token}` },
   });
-  return res.data; // Should be an array of sessions with status
+  return res.data;
 };
 
 const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) => {
   const { theme } = useTheme();
+  const queryClient = useQueryClient();
   const [instructorId, setInstructorId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,19 +41,27 @@ const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) =>
     getUserId();
   }, []);
 
+  useFocusEffect(
+  useCallback(() => {
+    if (instructorId) {
+      queryClient.invalidateQueries({ queryKey: ['instructorProfile', instructorId] });
+      queryClient.invalidateQueries({ queryKey: ['instructorSessions'] });
+    }
+  }, [queryClient, instructorId])
+);
+
+
   const { data: instructorData, isLoading, error } = useQuery({
     queryKey: ['instructorProfile', instructorId],
     queryFn: () => fetchInstructorProfile(instructorId as string),
     enabled: !!instructorId,
   });
 
-  // Fetch active attendance sessions for this instructor
   const { data: sessions, isLoading: sessionsLoading } = useQuery({
     queryKey: ['instructorSessions'],
     queryFn: fetchSessions,
   });
 
-  // Show loading spinner only while loading or waiting for instructorId
   if (!instructorId || isLoading || sessionsLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
@@ -118,9 +127,7 @@ const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) =>
           </View>
 
           <Text style={[styles.sectionTitle, { color: theme.text }]}>My Sessions</Text>
-          {sessionsLoading ? (
-            <ActivityIndicator color={theme.text} />
-          ) : Array.isArray(sessions) && sessions.length > 0 ? (
+          {Array.isArray(sessions) && sessions.length > 0 ? (
             sessions.map((session: any) => (
               <TouchableOpacity
                 key={session.attendanceId}
@@ -137,7 +144,7 @@ const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) =>
                 }
               >
                 <ClassCard
-                  title={`${session.courseCode} - ${session.title}`}
+                  title={`${session.courseCode} - ${session.courseName}`}
                   time={new Date(session.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   hall={session.hallName}
                   status={session.status === 'open' ? 'Ongoing' : 'Over'}
@@ -169,9 +176,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold'
   },
-  sub: {
-    // color will be set by theme
-  },
+  sub: {},
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -1,16 +1,114 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  TextInput,
+} from 'react-native';
 import Header from '../../../../components/Header';
 import ClassCard from '../../../../components/ClassCard';
 import { router } from 'expo-router';
+import { useTheme } from '../../../../ThemeContext';
+import { useFocusEffect } from '@react-navigation/native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
 
 type StudentHomeScreenProps = {
   title?: string;
 };
 
+const fetchStudentProfile = async (studentId: string) => {
+  console.log('Fetching student profile for userId:', studentId);
+  const res = await axios.get(`http://192.168.1.187:3000/api/user/${studentId}`);
+  return res.data;
+};
+
+const fetchOpenAttendances = async () => {
+  const token = await SecureStore.getItemAsync('token');
+  const res = await axios.get('http://192.168.1.187:3000/api/attendance/open-sessions', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
 const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ title }) => {
-  const name = "Michael Mitc";
-  
+  const { theme } = useTheme();
+  const queryClient = useQueryClient();
+  const [studentId, setStudentId] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState('');
+
+  useEffect(() => {
+    const getUserId = async () => {
+      const storedUserId = await SecureStore.getItemAsync('userId');
+      setStudentId(storedUserId);
+    };
+    getUserId();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (studentId) {
+        queryClient.invalidateQueries({ queryKey: ['studentProfile', studentId] });
+        queryClient.invalidateQueries({ queryKey: ['openAttendances'] });
+      }
+    }, [queryClient, studentId])
+  );
+
+  const {
+    data: studentData,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['studentProfile', studentId],
+    queryFn: () => fetchStudentProfile(studentId as string),
+    enabled: !!studentId,
+  });
+
+  const {
+    data: openSessions,
+    isLoading: sessionsLoading,
+    refetch: refetchSessions,
+  } = useQuery({
+    queryKey: ['openAttendances'],
+    queryFn: fetchOpenAttendances,
+    enabled: !!studentId,
+  });
+
+  if (!studentId || isLoading || sessionsLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator color={theme.text} size="large" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text>Error loading student profile</Text>
+      </View>
+    );
+  }
+
+  const firstName = studentData?.firstName || 'Student';
+  const lastName = studentData?.lastName || '';
+  const matricule = studentData?.matriNumber || '';
+  const name = `${firstName} ${lastName}`;
+
+  // Filter sessions by search text (course code or name)
+  const filteredSessions = openSessions?.filter((session: any) => {
+    const searchLower = searchText.toLowerCase();
+    return (
+      session.courseCode.toLowerCase().includes(searchLower) ||
+      session.courseName.toLowerCase().includes(searchLower) ||
+      session.hallName.toLowerCase().includes(searchLower)
+    );
+  });
+
   return (
     <View style={styles.container}>
       <Header name={name} />
@@ -19,18 +117,19 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ title }) => {
           <View style={styles.header}>
             <View>
               <Text style={styles.greeting}>{title ?? `Welcome ${name}`}</Text>
+              <Text style={styles.sub}> Matricule: {matricule}</Text>
               <Text style={styles.sub}>Check-in smarter, Learn Better</Text>
             </View>
           </View>
 
           <View style={styles.grid}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.box}
               onPress={() => router.push('/screens/student/otherScreens/StudentFaceRegistrationScreen')}
             >
               <Text style={styles.boxText}>Face Registration</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => router.push('/screens/student/(tabs)/studentAttendanceScreen')}
               style={styles.box}
             >
@@ -38,17 +137,44 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ title }) => {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.sectionTitle}>Today's Classes</Text>
-        <TouchableOpacity 
-          onPress={() => router.push('/screens/student/otherScreens/CheckinScreen')}
-          >
-          <ClassCard
-            title="CEF331 Advanced Database"
-            time="10:00AM-12:00AM"
-            hall="BGFL"
-            status="Active"
+          <Text style={styles.sectionTitle}>Today's Active Sessions</Text>
+
+          <TextInput
+            placeholder="Search classes by code, name or hall..."
+            value={searchText}
+            onChangeText={setSearchText}
+            style={styles.searchInput}
           />
-          </TouchableOpacity>
+
+          {filteredSessions && filteredSessions.length > 0 ? (
+            filteredSessions.map((session: any) => (
+              <TouchableOpacity
+                key={session.attendanceId}
+                onPress={() =>
+                  router.push(
+                    `/screens/student/otherScreens/CheckinScreen?attendanceId=${session.attendanceId}`
+                  )
+                }
+              >
+                <ClassCard
+                  title={`${session.courseCode} ${session.courseName}`}
+                  time={`${new Date(session.startTime).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })} - ${new Date(session.endTime).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}`}
+
+
+                  hall={session.hallName}
+                  status="Active"
+                />
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Text style={styles.noSessionText}>No active sessions found.</Text>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -66,13 +192,13 @@ const styles = StyleSheet.create({
   headerContainer: {
     padding: 15,
   },
-  greeting: { 
-    color: '#fff', 
-    fontSize: 18, 
-    fontWeight: 'bold' 
+  greeting: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
-  sub: { 
-    color: '#d0e5ff' 
+  sub: {
+    color: '#d0e5ff',
   },
   header: {
     flexDirection: 'row',
@@ -108,6 +234,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     paddingHorizontal: 20,
     marginBottom: 10,
+  },
+  searchInput: {
+    height: 40,
+    borderColor: '#4f9dfc',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+  },
+  noSessionText: {
+    fontSize: 14,
+    color: '#666',
+    paddingHorizontal: 20,
+    marginTop: 10,
+    fontStyle: 'italic',
   },
 });
 

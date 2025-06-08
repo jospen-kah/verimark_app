@@ -3,6 +3,8 @@ const router = express.Router();
 const attendanceController = require('../controllers/attendance.controller');
 const { protect, restrictTo } = require('../middlewares/authMiddleware');
 
+router.post('/verify-geofence',protect,restrictTo('student'), attendanceController.verifyGeofence);
+
 router.post(
   '/initiate',
   protect,
