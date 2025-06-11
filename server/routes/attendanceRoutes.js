@@ -49,5 +49,8 @@ router.get(
   attendanceController.getInstructorAttendances
 );
 
+router.get('/session/:attendanceId', 
+  attendanceController.getAttendanceSession);
+
 
 module.exports = router;

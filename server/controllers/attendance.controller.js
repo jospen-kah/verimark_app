@@ -117,7 +117,7 @@ exports.checkIn = async (req, res) => {
     });
 
     await log.save();
-
+ 
     res.status(200).json({ message: 'Check-in logged successfully', log });
 
   } catch (err) {
@@ -367,6 +367,119 @@ exports.getInstructorAttendances = async (req, res) => {
   }
 };
 
+exports.getAttendanceSession = async (req, res) => {
+  try {
+    const { attendanceId } = req.params;
+
+    // Validate attendanceId
+    if (!attendanceId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Attendance ID is required'
+      });
+    }
+
+    // Find the attendance session by ID and populate related data
+    const session = await Attendance.findById(attendanceId)
+      .populate({
+        path: 'courseId',
+        select: 'courseCode courseName',
+        model: Course
+      })
+      .populate({
+        path: 'hallId',
+        select: 'hallName',
+        model: Hall
+      })
+      .select('startTime endTime status createdAt');
+
+    // Check if session exists
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attendance session not found'
+      });
+    }
+
+    // Debug logging - remove in production
+    console.log('Session data:', {
+      id: session._id,
+      startTime: session.startTime,
+      endTime: session.endTime,
+      status: session.status,
+      currentTime: new Date()
+    });
+
+    // Check if session is still active
+    const currentTime = new Date();
+    // Handle both string and Date types for endTime
+    const sessionEndTime = session.endTime instanceof Date 
+      ? session.endTime 
+      : new Date(session.endTime);
+    
+    // More detailed validation with better error messages
+    if (session.status !== 'open') {
+      return res.status(400).json({
+        success: false,
+        message: 'This attendance session is closed',
+        debug: {
+          status: session.status,
+          currentTime: currentTime.toISOString(),
+          endTime: sessionEndTime.toISOString()
+        }
+      });
+    }
+
+    if (currentTime > sessionEndTime) {
+      return res.status(400).json({
+        success: false,
+        message: 'This attendance session has ended',
+        debug: {
+          currentTime: currentTime.toISOString(),
+          endTime: sessionEndTime.toISOString(),
+          timeDifference: currentTime - sessionEndTime
+        }
+      });
+    }
+
+    // Format the response
+    const sessionData = {
+      attendanceId: session._id,
+      courseCode: session.courseId?.courseCode || 'N/A',
+      courseName: session.courseId?.courseName || 'Unknown Course',
+      hallName: session.hallId?.hallName || 'Unknown Hall',
+      startTime: session.startTime,
+      endTime: session.endTime,
+      status: session.status,
+      createdAt: session.createdAt,
+      // Add time remaining for debugging
+      timeRemaining: sessionEndTime ? Math.max(0, sessionEndTime - currentTime) : null
+    };
+
+    res.status(200).json({
+      success: true,
+      data: sessionData,
+      message: 'Session details retrieved successfully'
+    });
+
+  } catch (error) {
+    console.error('Error fetching attendance session:', error);
+    
+    // Handle different types of errors
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid attendance ID format'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while fetching session details',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
 
 
 
