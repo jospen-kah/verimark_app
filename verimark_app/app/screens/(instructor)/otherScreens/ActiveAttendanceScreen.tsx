@@ -133,7 +133,7 @@ const ActiveAttendanceScreen = () => {
     mutationFn: async () => {
       const token = await SecureStore.getItemAsync('token');
       const res = await axios.post(
-        'http://192.168.1.139:3000/api/attendance/end-session',
+        'http://192.168.1.172:3000/api/attendance/end-session',
         { attendanceId: sessionId },
         {
           headers: {
@@ -181,7 +181,7 @@ const ActiveAttendanceScreen = () => {
   // Fetch session status
   const fetchSessionStatus = async (sessionId: string, token: string) => {
     const res = await axios.get(
-      `http://192.168.1.139:3000/api/attendance/session-status/${sessionId}`,
+      `http://192.168.1.172:3000/api/attendance/session-status/${sessionId}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,

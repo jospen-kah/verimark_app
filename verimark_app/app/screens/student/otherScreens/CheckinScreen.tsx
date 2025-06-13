@@ -15,7 +15,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import axios, { AxiosError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'http://192.168.1.139:3000/api'; // Your backend URL
+const API_BASE_URL = 'http://192.168.1.172:3000/api'; // Your backend URL
 
 const CheckInScreen = () => {
   const navigation = useNavigation();
@@ -205,150 +205,153 @@ const CheckInScreen = () => {
   };
 
   const handleCheckIn = async () => {
-    if (!attendanceId) {
-      Alert.alert('Error', 'No active attendance session to check into.');
+  if (!attendanceId) {
+    Alert.alert('Error', 'No active attendance session to check into.');
+    return;
+  }
+
+  setLoading(true);
+  setStatusMessage('Fetching location...');
+
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      handleAuthError();
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
-    setStatusMessage('Fetching location...');
+    // Get current location
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
+    });
+    const { latitude, longitude } = location.coords;
 
-    try {
-      const token = await getAuthToken(); // Back to async since SecureStore is async
-      if (!token) {
+    console.log('Current location:', { latitude, longitude });
+
+    // 1. Verify geofence
+    setStatusMessage('Verifying location in geofence...');
+    const geoRes = await axios.post(
+      `${API_BASE_URL}/attendance/verify-geofence`,
+      {
+        latitude,
+        longitude,
+        attendanceId,
+      },
+      { 
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        timeout: 15000,
+      }
+    );
+
+    console.log('Geofence response:', geoRes.data);
+
+    if (!geoRes.data.inside) {
+      Alert.alert('Location Error', 'You are not inside the required location for this class.');
+      setLoading(false);
+      setStatusMessage('Location verification failed');
+      return;
+    }
+
+    // 2. Take picture for face verification
+    setStatusMessage('Taking picture...');
+    if (!cameraRef.current) {
+      Alert.alert('Camera Error', 'Camera not available.');
+      setLoading(false);
+      setStatusMessage('Camera unavailable');
+      return;
+    }
+
+    const photo = await cameraRef.current.takePictureAsync({ 
+      quality: 0.7, 
+      base64: false,
+      skipProcessing: true,
+    });
+    
+    if (!photo.uri) {
+      Alert.alert('Camera Error', 'Failed to take picture.');
+      setLoading(false);
+      setStatusMessage('Photo capture failed');
+      return;
+    }
+
+    console.log('Photo taken:', photo.uri);
+
+    // 3. Submit face image, attendanceId, and location data for check-in
+    setStatusMessage('Verifying face and checking in...');
+
+    const formData = new FormData();
+    formData.append('attendanceId', attendanceId);
+    // ADD THE MISSING LOCATION DATA
+    formData.append('latitude', latitude.toString());
+    formData.append('longitude', longitude.toString());
+    formData.append('faceImage', {
+      uri: photo.uri,
+      name: 'face.jpg',
+      type: 'image/jpeg',
+    } as any);
+
+    const checkInRes = await axios.post(`${API_BASE_URL}/attendance/check-in`, formData, {
+      headers: { 
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${token}`,
+      },
+      timeout: 30000,
+    });
+
+    console.log('Check-in response:', checkInRes.data);
+
+    if (checkInRes.status === 200) {
+      setStatusMessage('Check-in successful!');
+      Alert.alert('Success', 'You have checked in successfully!', [
+        {
+          text: 'OK',
+          onPress: () => navigation.goBack(),
+        },
+      ]);
+    } else {
+      const errorMessage = checkInRes.data.message || 'Check-in failed for unknown reason';
+      Alert.alert('Check-in Failed', errorMessage);
+      setStatusMessage('Check-in failed');
+    }
+  } catch (error: any) {
+    console.error('Check-in error:', error);
+    
+    let errorMessage = 'Something went wrong during check-in';
+    
+    if (axios.isAxiosError(error)) {
+      console.log('Check-in error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Request timeout. Please try again.';
+      } else if (error.response?.status === 401) {
         handleAuthError();
         setLoading(false);
         return;
+      } else if (error.response?.status === 400) {
+        errorMessage = error.response.data.message || 'Invalid request data';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'Attendance session not found';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
       }
-
-      // Get current location
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-      const { latitude, longitude } = location.coords;
-
-      console.log('Current location:', { latitude, longitude }); // Debug log
-
-      // 1. Verify geofence
-      setStatusMessage('Verifying location in geofence...');
-      const geoRes = await axios.post(
-        `${API_BASE_URL}/attendance/verify-geofence`,
-        {
-          latitude,
-          longitude,
-          attendanceId,
-        },
-        { 
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          timeout: 15000,
-        }
-      );
-
-      console.log('Geofence response:', geoRes.data); // Debug log
-
-      if (!geoRes.data.inside) {
-        Alert.alert('Location Error', 'You are not inside the required location for this class.');
-        setLoading(false);
-        setStatusMessage('Location verification failed');
-        return;
-      }
-
-      // 2. Take picture for face verification
-      setStatusMessage('Taking picture...');
-      if (!cameraRef.current) {
-        Alert.alert('Camera Error', 'Camera not available.');
-        setLoading(false);
-        setStatusMessage('Camera unavailable');
-        return;
-      }
-
-      const photo = await cameraRef.current.takePictureAsync({ 
-        quality: 0.7, 
-        base64: false,
-        skipProcessing: true,
-      });
-      
-      if (!photo.uri) {
-        Alert.alert('Camera Error', 'Failed to take picture.');
-        setLoading(false);
-        setStatusMessage('Photo capture failed');
-        return;
-      }
-
-      console.log('Photo taken:', photo.uri); // Debug log
-
-      // 3. Submit face image and attendanceId for check-in
-      setStatusMessage('Verifying face and checking in...');
-
-      const formData = new FormData();
-      formData.append('attendanceId', attendanceId);
-      formData.append('faceImage', {
-        uri: photo.uri,
-        name: 'face.jpg',
-        type: 'image/jpeg',
-      } as any);
-
-      const checkInRes = await axios.post(`${API_BASE_URL}/attendance/check-in`, formData, {
-        headers: { 
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`,
-        },
-        timeout: 30000, // 30 second timeout for face verification
-      });
-
-      console.log('Check-in response:', checkInRes.data); // Debug log
-
-      if (checkInRes.status === 200) {
-        setStatusMessage('Check-in successful!');
-        Alert.alert('Success', 'You have checked in successfully!', [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ]);
-      } else {
-        const errorMessage = checkInRes.data.message || 'Check-in failed for unknown reason';
-        Alert.alert('Check-in Failed', errorMessage);
-        setStatusMessage('Check-in failed');
-      }
-    } catch (error: any) {
-      console.error('Check-in error:', error);
-      
-      let errorMessage = 'Something went wrong during check-in';
-      
-      if (axios.isAxiosError(error)) {
-        console.log('Check-in error details:', {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message
-        });
-        
-        if (error.code === 'ECONNABORTED') {
-          errorMessage = 'Request timeout. Please try again.';
-        } else if (error.response?.status === 401) {
-          handleAuthError();
-          setLoading(false);
-          return;
-        } else if (error.response?.status === 400) {
-          errorMessage = error.response.data.message || 'Invalid request data';
-        } else if (error.response?.status === 404) {
-          errorMessage = 'Attendance session not found';
-        } else if (error.response?.data?.message) {
-          errorMessage = error.response.data.message;
-        }
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      Alert.alert('Check-in Error', errorMessage);
-      setStatusMessage('Check-in error occurred');
-    } finally {
-      setLoading(false);
+    } else if (error.message) {
+      errorMessage = error.message;
     }
-  };
+    
+    Alert.alert('Check-in Error', errorMessage);
+    setStatusMessage('Check-in error occurred');
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (!permission?.granted || !hasLocationPermission) {
     return (

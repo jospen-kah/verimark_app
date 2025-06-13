@@ -16,7 +16,7 @@ import axios from 'axios';
 
 // Fetch all halls from backend
 const fetchAllHalls = async () => {
-  const res = await axios.get('http://192.168.1.139:3000/api/halls/');
+  const res = await axios.get('http://192.168.1.172:3000/api/halls/');
   return res.data; // Should be an array of all halls
 };
 

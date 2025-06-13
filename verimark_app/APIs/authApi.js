@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 export const registerUser = async (formData) => {
-  const res = await axios.post('http://192.168.1.139:3000/api/auth/register', {
+  const res = await axios.post('http://192.168.1.172:3000/api/auth/register', {
     firstName: formData.firstName,
     lastName: formData.lastName,
     email: formData.email,

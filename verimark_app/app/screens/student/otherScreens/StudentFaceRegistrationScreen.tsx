@@ -46,7 +46,7 @@ const FaceRegistrationScreen = () => {
         name: `face.${fileType}`,
       } as any);
 
-      return axios.post('http://192.168.1.139:3000/api/face/register', formData, {
+      return axios.post('http://192.168.1.172:3000/api/face/register', formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',

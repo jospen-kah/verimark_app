@@ -7,6 +7,7 @@ const User = require('../models/User');
 const mongoose = require('mongoose');
 const Course = require('../models/Course');
 
+
 // Initiate attendance session
 exports.initiateAttendance = async (req, res) => {
   try {
