@@ -33,7 +33,7 @@ const VerifyEmailScreen = () => {
     }
     setLoading(true);
     try {
-      const response = await axios.post('http://192.168.1.187:3000/api/auth/verify-email', {
+      const response = await axios.post('http://192.168.1.139:3000/api/auth/verify-email', {
         email,
         code: verificationCode,
       });

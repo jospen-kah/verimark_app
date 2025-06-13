@@ -22,7 +22,7 @@ const { width } = Dimensions.get('window');
 
 // API function for login
 const loginUser = async (formData: { email: string; password: string }) => {
-  const res = await axios.post('http://192.168.1.187:3000/api/auth/login', {
+  const res = await axios.post('http://192.168.1.139:3000/api/auth/login', {
     email: formData.email,
     password: formData.password,
   });

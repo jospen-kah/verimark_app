@@ -25,7 +25,7 @@ type Course = {
 
 // Fetch all courses with no restriction
 const fetchAllCourses = async () => {
-  const res = await axios.get('http://192.168.1.187:3000/api/courses');
+  const res = await axios.get('http://192.168.1.139:3000/api/courses');
   return res.data; // Should be an array of all courses
 };
 
