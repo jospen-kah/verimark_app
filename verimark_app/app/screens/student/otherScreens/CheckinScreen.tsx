@@ -15,7 +15,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import axios, { AxiosError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'http://192.168.1.172:3000/api'; // Your backend URL
+const API_BASE_URL = 'http://192.168.1.107:3000/api'; // Your backend URL
 
 const CheckInScreen = () => {
   const navigation = useNavigation();
@@ -128,83 +128,183 @@ const CheckInScreen = () => {
     getAttendanceId();
   }, [route]);
 
-  const fetchSessionDetails = async (sessionAttendanceId: string) => {
-    try {
-      setStatusMessage('Loading session details...');
-      console.log('Fetching session for ID:', sessionAttendanceId); // Debug log
+const fetchSessionDetails = async (sessionAttendanceId: string) => {
+  try {
+    setStatusMessage('Loading session details...');
+    console.log('Fetching session for ID:', sessionAttendanceId);
+    
+    const token = await getAuthToken();
+    if (!token) {
+      handleAuthError();
+      return;
+    }
+
+    const response = await axios.get(`${API_BASE_URL}/attendance/session/${sessionAttendanceId}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      timeout: 15000, // Increased timeout
+    });
+
+    console.log('Full API response:', response.data);
+
+    const sessionData = response.data.success ? response.data.data : response.data;
+    
+    if (sessionData) {
+      console.log('Session data:', sessionData);
       
-      const token = await getAuthToken(); // Back to async since SecureStore is async
-      if (!token) {
-        handleAuthError();
+      // Check if session is still active (optional client-side validation)
+      const now = new Date();
+      const endTime = new Date(sessionData.endTime);
+      
+      if (now > endTime) {
+        Alert.alert(
+          'Session Expired', 
+          'This attendance session has already ended. Please contact your instructor if you need assistance.',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.goBack()
+            }
+          ]
+        );
+        setStatusMessage('Session has expired');
         return;
       }
-
-      // Fixed: Use the correct endpoint that matches your backend controller
-      const response = await axios.get(`${API_BASE_URL}/attendance/session/${sessionAttendanceId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        timeout: 10000, // 10 second timeout
+      
+      setSessionInfo({
+        courseCode: sessionData.courseCode || 'N/A',
+        courseName: sessionData.courseName || 'Unknown Course',
+        hallName: sessionData.hallName || 'Unknown Hall',
+        startTime: sessionData.startTime || '',
+        endTime: sessionData.endTime || '',
       });
-
-      console.log('Full API response:', response.data); // Debug log
-
-      // Fixed: Access the data correctly based on your backend response structure
-      const sessionData = response.data.success ? response.data.data : response.data;
+      setStatusMessage('Session loaded successfully. Ready to check in.');
+    } else {
+      console.log('No session data found in response');
+      Alert.alert('Error', 'Session not found.');
+      setStatusMessage('Session not found');
+      setTimeout(() => navigation.goBack(), 1000);
+    }
+  } catch (err: unknown) {
+    console.error('Error loading session details:', err);
+    
+    if (axios.isAxiosError(err)) {
+      const errorMessage = err.response?.data?.message || err.message || 'Unknown error';
+      const debugInfo = err.response?.data?.debug;
       
-      if (sessionData) {
-        console.log('Session data:', sessionData); // Debug log
-        
-        setSessionInfo({
-          courseCode: sessionData.courseCode || 'N/A',
-          courseName: sessionData.courseName || 'Unknown Course',
-          hallName: sessionData.hallName || 'Unknown Hall',
-          startTime: sessionData.startTime || '',
-          endTime: sessionData.endTime || '',
-        });
-        setStatusMessage('Session loaded successfully. Ready to check in.');
-      } else {
-        console.log('No session data found in response'); // Debug log
-        Alert.alert('Error', 'Session not found.');
-        setStatusMessage('Session not found');
-        setTimeout(() => navigation.goBack(), 1000);
-      }
-    } catch (err: unknown) {
-      console.error('Error loading session details:', err);
+      console.log('Axios error details:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: errorMessage
+      });
       
-      if (axios.isAxiosError(err)) {
-        const errorMessage = err.response?.data?.message || err.message || 'Unknown error';
-        console.log('Axios error details:', {
-          status: err.response?.status,
-          data: err.response?.data,
-          message: errorMessage
-        });
-        
-        if (err.response?.status === 401) {
+      // Handle different error scenarios
+      switch (err.response?.status) {
+        case 401:
           handleAuthError();
           return;
-        } else if (err.response?.status === 403) {
+          
+        case 403:
           Alert.alert('Access Denied', 'You do not have permission to access this resource.');
-        } else if (err.response?.status === 404) {
-          Alert.alert('Session Not Found', 'The attendance session could not be found.');
-        } else if (err.response?.status === 400) {
-          // Handle the specific error from your backend
-          Alert.alert('Session Error', err.response.data.message || 'This attendance session has ended or is no longer active');
-        } else {
-          Alert.alert('Error', `Failed to load session details: ${errorMessage}`);
-        }
-      } else {
-        console.log('Unexpected error:', err);
-        Alert.alert('Error', 'An unexpected error occurred while loading session details.');
+          break;
+          
+        case 404:
+          Alert.alert('Session Not Found', 'The attendance session could not be found or may have been deleted.');
+          break;
+          
+        case 400:
+          // Handle session expiry specifically
+          if (errorMessage.includes('ended') || errorMessage.includes('expired')) {
+            const timeInfo = debugInfo ? 
+              `\n\nSession ended at: ${new Date(debugInfo.endTime).toLocaleString()}` : '';
+            
+            Alert.alert(
+              'Session Unavailable', 
+              `This attendance session has ended and is no longer accepting check-ins.${timeInfo}`,
+              [
+                {
+                  text: 'Contact Instructor',
+                  onPress: () => {
+                    // You could add logic here to show instructor contact info
+                    Alert.alert('Contact Info', 'Please reach out to your course instructor for assistance with late attendance.');
+                  }
+                },
+                {
+                  text: 'OK',
+                  onPress: () => navigation.goBack(),
+                  style: 'default'
+                }
+              ]
+            );
+          } else {
+            Alert.alert('Session Error', errorMessage);
+          }
+          break;
+          
+        case 500:
+          Alert.alert('Server Error', 'There was a problem with the server. Please try again later.');
+          break;
+          
+        default:
+          Alert.alert('Connection Error', `Failed to load session: ${errorMessage}`);
       }
-      
-      setStatusMessage('Failed to load session');
-      setTimeout(() => navigation.goBack(), 2000);
+    } else {
+      console.log('Unexpected error:', err);
+      Alert.alert('Error', 'An unexpected error occurred. Please check your internet connection and try again.');
     }
-  };
+    
+    setStatusMessage('Failed to load session');
+    setTimeout(() => navigation.goBack(), 3000);
+  }
+};
 
-  const handleCheckIn = async () => {
+// Helper function to check session status before attempting to fetch
+const checkSessionStatus = async (sessionId: string): Promise<boolean> => {
+  try {
+    const token = await getAuthToken();
+    if (!token) return false;
+
+    // Quick status check endpoint (if you have one)
+    const response = await axios.head(`${API_BASE_URL}/attendance/session/${sessionId}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+      timeout: 5000,
+    });
+    
+    return response.status === 200;
+  } catch {
+    return false;
+  }
+};
+
+// Enhanced session validation
+const validateSessionTiming = (startTime: string, endTime: string) => {
+  const now = new Date();
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  
+  if (now < start) {
+    return { valid: false, reason: 'not_started', message: 'Session has not started yet' };
+  }
+  
+  if (now > end) {
+    return { valid: false, reason: 'expired', message: 'Session has ended' };
+  }
+  
+  // Check if session is ending soon (within 5 minutes)
+  const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+  const isEndingSoon = fiveMinutesFromNow > end;
+  
+  return { 
+    valid: true, 
+    reason: isEndingSoon ? 'ending_soon' : 'active',
+    message: isEndingSoon ? 'Session ending soon' : 'Session active'
+  };
+};
+
+
+ const handleCheckIn = async () => {
   if (!attendanceId) {
     Alert.alert('Error', 'No active attendance session to check into.');
     return;
@@ -280,12 +380,12 @@ const CheckInScreen = () => {
 
     console.log('Photo taken:', photo.uri);
 
-    // 3. Submit face image, attendanceId, and location data for check-in
+    // 3. Submit face image, coordinates, and attendanceId for check-in
     setStatusMessage('Verifying face and checking in...');
 
     const formData = new FormData();
     formData.append('attendanceId', attendanceId);
-    // ADD THE MISSING LOCATION DATA
+    // 🔥 FIX: Add the missing coordinates to FormData
     formData.append('latitude', latitude.toString());
     formData.append('longitude', longitude.toString());
     formData.append('faceImage', {
@@ -294,12 +394,21 @@ const CheckInScreen = () => {
       type: 'image/jpeg',
     } as any);
 
+    // Debug FormData contents
+    console.log('=== FORMDATA DEBUG ===');
+    console.log('FormData contents:');
+    console.log('- attendanceId:', attendanceId);
+    console.log('- latitude:', latitude);
+    console.log('- longitude:', longitude);
+    console.log('- faceImage URI:', photo.uri);
+    console.log('=== END FORMDATA DEBUG ===');
+
     const checkInRes = await axios.post(`${API_BASE_URL}/attendance/check-in`, formData, {
       headers: { 
         'Content-Type': 'multipart/form-data',
         'Authorization': `Bearer ${token}`,
       },
-      timeout: 30000,
+      timeout: 30000, // 30 second timeout for face verification
     });
 
     console.log('Check-in response:', checkInRes.data);
@@ -326,19 +435,28 @@ const CheckInScreen = () => {
       console.log('Check-in error details:', {
         status: error.response?.status,
         data: error.response?.data,
-        message: error.message
+        message: error.message,
+        code: error.code
       });
       
       if (error.code === 'ECONNABORTED') {
         errorMessage = 'Request timeout. Please try again.';
+      } else if (error.code === 'NETWORK_ERROR' || error.message === 'Network Error') {
+        errorMessage = 'Network connection error. Please check your internet connection and try again.';
       } else if (error.response?.status === 401) {
         handleAuthError();
         setLoading(false);
         return;
       } else if (error.response?.status === 400) {
         errorMessage = error.response.data.message || 'Invalid request data';
+        // Log detailed error for debugging
+        console.log('400 Error details:', error.response.data);
+      } else if (error.response?.status === 403) {
+        errorMessage = error.response.data.message || 'Access denied';
       } else if (error.response?.status === 404) {
         errorMessage = 'Attendance session not found';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error. Please try again later.';
       } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       }

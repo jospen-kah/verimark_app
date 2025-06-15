@@ -16,13 +16,13 @@ type InstructorHomeScreenProps = {
 
 const fetchInstructorProfile = async (instructorId: string) => {
   console.log('Fetching instructor profile for userId:', instructorId);
-  const res = await axios.get(`http://192.168.1.172:3000/api/user/${instructorId}`);
+  const res = await axios.get(`http://192.168.1.107:3000/api/user/${instructorId}`);
   return res.data;
 };
 
 const fetchSessions = async () => {
   const token = await SecureStore.getItemAsync('token');
-  const res = await axios.get('http://192.168.1.172:3000/api/attendance/instructor-sessions', {
+  const res = await axios.get('http://192.168.1.107:3000/api/attendance/instructor-sessions', {
     headers: { Authorization: `Bearer ${token}` },
   });
   return res.data;
