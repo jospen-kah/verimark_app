@@ -6,6 +6,7 @@ const Hall = require('../models/Hall');
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const Course = require('../models/Course');
+const { compareFace } = require('../services/face.service');
 
 
 // Initiate attendance session
@@ -76,57 +77,298 @@ exports.verifyGeofence = async (req, res) => {
 };
 
 
-// Check-in controller
+
+const FaceData = require('../models/FaceData'); // Make sure to import your FaceData model
+
 exports.checkIn = async (req, res) => {
   try {
+    console.log('=== CHECK-IN CONTROLLER START ===');
+    console.log('Request timestamp:', new Date().toISOString());
+    
     const { latitude, longitude, attendanceId } = req.body;
-
+    
+    // Debug logging
+    console.log('Request body:', req.body);
+    console.log('User ID:', req.user?._id);
+    console.log('File received:', !!req.file);
+    
+    // Validate required fields
     if (!attendanceId) {
-      return res.status(400).json({ message: 'Attendance session ID is required' });
+      console.log('❌ Missing attendanceId');
+      return res.status(400).json({ 
+        success: false,
+        message: 'Attendance session ID is required' 
+      });
     }
 
+    if (!latitude || !longitude) {
+      console.log('❌ Missing coordinates');
+      return res.status(400).json({ 
+        success: false,
+        message: 'Location coordinates are required' 
+      });
+    }
+
+    // Check if face image is uploaded
+    if (!req.file) {
+      console.log('❌ No file uploaded');
+      return res.status(400).json({ 
+        success: false,
+        message: 'Face image is required for check-in' 
+      });
+    }
+
+    // Detailed file debugging
+    console.log('=== FILE DEBUG INFO ===');
+    console.log('File fieldname:', req.file.fieldname);
+    console.log('File originalname:', req.file.originalname);
+    console.log('File mimetype:', req.file.mimetype);
+    console.log('File size:', req.file.size);
+    console.log('File buffer exists:', !!req.file.buffer);
+    console.log('File buffer length:', req.file.buffer?.length);
+    console.log('File path exists:', !!req.file.path);
+    console.log('=== END FILE DEBUG ===');
+
+    // Find attendance session
     const session = await Attendance.findOne({ _id: attendanceId, status: 'open' })
       .populate('hallId');
 
     if (!session) {
-      return res.status(404).json({ message: 'No active session found for this ID' });
+      console.log('❌ No active session found');
+      return res.status(404).json({ 
+        success: false,
+        message: 'No active session found for this ID' 
+      });
     }
 
+    console.log('✅ Attendance session found:', session._id);
     const hall = session.hallId;
 
     // Get altitude from external API
+    console.log('Getting elevation for coordinates:', { latitude, longitude });
     const altitude = await getElevation(latitude, longitude);
-    console.log(`Altitude for coordinates (${latitude}, ${longitude}): ${altitude}`); 
+    console.log(`Altitude for coordinates (${latitude}, ${longitude}): ${altitude}`);
 
     // Validate geofence including altitude
+    console.log('Validating geofence...');
     const isInside = isInsidePolygonWithAltitude(
-      { latitude, longitude, altitude },
+      { latitude: parseFloat(latitude), longitude: parseFloat(longitude), altitude },
       hall.coordinates,
       hall.minAltitude,
       hall.maxAltitude
     );
 
+    console.log(`Point ${latitude}, ${longitude} with altitude ${altitude} is inside polygon:`, isInside);
+
     if (!isInside) {
-      return res.status(403).json({ message: 'You are not in the hall geofence' });
+      console.log('❌ Not inside geofence');
+      return res.status(403).json({ 
+        success: false,
+        message: 'You are not in the hall geofence' 
+      });
+    }
+
+    console.log('✅ Geofence validation passed');
+
+    // Check if student already checked in for this session
+    const existingLog = await AttendanceLog.findOne({
+      attendanceId: session._id,
+      studentId: req.user._id
+    });
+
+    if (existingLog) {
+      console.log('❌ User already checked in');
+      return res.status(400).json({ 
+        success: false,
+        message: 'You have already checked in for this session' 
+      });
+    }
+
+    console.log('✅ No existing check-in found');
+
+    // Retrieve face data from FaceData collection
+    console.log('Retrieving face data for student:', req.user._id);
+    const faceDataDoc = await FaceData.findOne({ studentId: req.user._id });
+    
+    if (!faceDataDoc) {
+      console.log('❌ No face data document found');
+      return res.status(400).json({ 
+        success: false,
+        message: 'No face data registered for this user. Please register your face first.' 
+      });
+    }
+
+    // Debug the retrieved face data
+    console.log('=== FACE DATA DEBUG INFO ===');
+    console.log('Face data document found:', !!faceDataDoc);
+    console.log('Face data array exists:', !!faceDataDoc.faceData);
+    console.log('Face data type:', typeof faceDataDoc.faceData);
+    console.log('Face data is array:', Array.isArray(faceDataDoc.faceData));
+    console.log('Face data length:', faceDataDoc.faceData?.length);
+    console.log('Face data sample (first 5):', faceDataDoc.faceData?.slice(0, 5));
+    console.log('Has NaN values:', faceDataDoc.faceData?.some(val => isNaN(val)));
+    console.log('All are numbers:', faceDataDoc.faceData?.every(val => typeof val === 'number'));
+    console.log('=== END FACE DATA DEBUG ===');
+
+    // Validate face data
+    if (!faceDataDoc.faceData || !Array.isArray(faceDataDoc.faceData) || faceDataDoc.faceData.length === 0) {
+      console.log('❌ Invalid face data format');
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid face data format. Please re-register your face.' 
+      });
+    }
+
+    console.log('✅ Face data validation passed');
+
+    // Get image buffer (handle both memory and disk storage)
+    let imageBuffer;
+    
+    if (req.file.buffer) {
+      // Memory storage
+      console.log('Using memory storage buffer');
+      imageBuffer = req.file.buffer;
+    } else if (req.file.path) {
+      // Disk storage - read file
+      console.log('Reading file from disk storage:', req.file.path);
+      const fs = require('fs');
+      try {
+        imageBuffer = fs.readFileSync(req.file.path);
+        console.log('✅ File read from disk, buffer length:', imageBuffer.length);
+        
+        // Clean up file after reading
+        fs.unlinkSync(req.file.path);
+        console.log('✅ Temporary file cleaned up');
+      } catch (fileError) {
+        console.error('❌ Error reading file from disk:', fileError);
+        return res.status(500).json({ 
+          success: false,
+          message: 'Error processing uploaded image' 
+        });
+      }
+    } else {
+      console.log('❌ No buffer or path available');
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid face image data - no buffer or file path available' 
+      });
+    }
+
+    // Validate image buffer
+    if (!imageBuffer || imageBuffer.length === 0) {
+      console.log('❌ Empty image buffer');
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid or empty face image data' 
+      });
+    }
+
+    console.log('✅ Image buffer ready, length:', imageBuffer.length);
+
+    // Perform face verification
+    try {
+      console.log('=== FACE VERIFICATION START ===');
+      console.log('Calling compareFace function...');
+      console.log('Image buffer length:', imageBuffer.length);
+      console.log('Stored face data length:', faceDataDoc.faceData.length);
+      
+      // Pass the actual faceData array from the FaceData document
+      const faceMatch = await compareFace(imageBuffer, faceDataDoc.faceData);
+      console.log('Face verification result:', faceMatch);
+      console.log('=== FACE VERIFICATION END ===');
+      
+      // Check if faceMatch is a boolean or an object with match property
+      let isMatch;
+      if (typeof faceMatch === 'boolean') {
+        isMatch = faceMatch;
+      } else if (faceMatch && typeof faceMatch === 'object' && 'match' in faceMatch) {
+        isMatch = faceMatch.match;
+      } else {
+        throw new Error('Invalid face verification result format');
+      }
+      
+      if (!isMatch) {
+        console.log('❌ Face verification failed');
+        return res.status(403).json({ 
+          success: false,
+          message: 'Face verification failed. Access denied.',
+          faceResult: faceMatch // Include details for debugging
+        });
+      }
+      
+      console.log('✅ Face verification successful');
+      
+    } catch (faceError) {
+      console.error('❌ Face verification error:', faceError);
+      console.error('Face error stack:', faceError.stack);
+      
+      // Additional debugging for face errors
+      console.log('=== FACE ERROR DEBUG ===');
+      console.log('Error message:', faceError.message);
+      console.log('Error name:', faceError.name);
+      console.log('Image buffer valid:', !!imageBuffer && imageBuffer.length > 0);
+      console.log('Face data valid:', !!faceDataDoc.faceData && Array.isArray(faceDataDoc.faceData));
+      console.log('=== END FACE ERROR DEBUG ===');
+      
+      return res.status(500).json({ 
+        success: false,
+        message: 'Face verification failed due to technical error',
+        error: process.env.NODE_ENV === 'development' ? faceError.message : 'Face verification error'
+      });
     }
 
     // Create check-in log
+    console.log('Creating attendance log...');
     const log = new AttendanceLog({
       attendanceId: session._id,
       studentId: req.user._id,
-      checkInTime: new Date()
+      checkInTime: new Date(),
+      faceVerified: true,
+      location: {
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        altitude: altitude
+      }
     });
 
     await log.save();
- 
-    res.status(200).json({ message: 'Check-in logged successfully', log });
+    console.log('✅ Attendance log saved:', log._id);
+
+    console.log('=== CHECK-IN SUCCESSFUL ===');
+    
+    res.status(200).json({ 
+      success: true,
+      message: 'Check-in logged successfully with face verification', 
+      log: {
+        id: log._id,
+        checkInTime: log.checkInTime,
+        faceVerified: log.faceVerified,
+        location: log.location
+      }
+    });
 
   } catch (err) {
-    console.error('Check-in error:', err.message);
-    res.status(500).json({ message: err.message });
+    console.error('❌ CHECK-IN CONTROLLER ERROR:', err);
+    console.error('Error stack:', err.stack);
+    
+    // Clean up uploaded file in case of error (disk storage)
+    if (req.file && req.file.path) {
+      try {
+        const fs = require('fs');
+        fs.unlinkSync(req.file.path);
+        console.log('✅ Cleaned up temporary file after error');
+      } catch (cleanupError) {
+        console.error('❌ File cleanup error:', cleanupError);
+      }
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error during check-in',
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+    });
   }
 };
-
 
 // Check-out controller
 exports.checkOut = async (req, res) => {

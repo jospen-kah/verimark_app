@@ -22,8 +22,8 @@ router.post(
 
 
 router.post('/check-in',
-  restrictTo('student'), 
   protect,
+  restrictTo('student'), 
   upload.single('faceImage'), 
   attendanceController.checkIn);
 

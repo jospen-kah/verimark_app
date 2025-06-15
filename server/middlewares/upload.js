@@ -1,29 +1,38 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
+// Ensure upload directory exists
+const uploadDir = 'uploads/faces';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log(`Created directory: ${uploadDir}`);
+}
 
-
-// Storage engine
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/faces');
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = `face-${Date.now()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  },
-});
+// Memory storage for face verification (provides buffer)
+const storage = multer.memoryStorage();
 
 // File filter (only images)
 const fileFilter = (req, file, cb) => {
   const allowed = ['image/jpeg', 'image/png', 'image/jpg'];
+  
   if (allowed.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Only .jpeg, .jpg, .png files are allowed'), false);
+    const error = new Error('Only .jpeg, .jpg, .png files are allowed');
+    error.code = 'INVALID_FILE_TYPE';
+    cb(error, false);
   }
 };
 
-const upload = multer({ storage, fileFilter });
+// Multer configuration
+const upload = multer({ 
+  storage, 
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+    files: 1 // Only allow 1 file at a time
+  }
+});
 
 module.exports = upload;

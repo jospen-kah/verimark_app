@@ -26,11 +26,31 @@ async function loadModels() {
 async function processAndEncodeFace(imageBuffer) {
   try {
     console.log('Starting face detection and encoding process');
+    
+    // Validate input buffer
+    if (!imageBuffer) {
+      throw new Error('Image buffer is undefined or null');
+    }
+    
+    if (!Buffer.isBuffer(imageBuffer)) {
+      throw new Error('Invalid image buffer type');
+    }
+    
+    if (imageBuffer.length === 0) {
+      throw new Error('Image buffer is empty');
+    }
+    
     console.log('Image buffer size:', imageBuffer.length);
     
     // Load image from buffer
-    const image = await canvas.loadImage(imageBuffer);
-    console.log('Image loaded successfully. Dimensions:', image.width, 'x', image.height);
+    let image;
+    try {
+      image = await canvas.loadImage(imageBuffer);
+      console.log('Image loaded successfully. Dimensions:', image.width, 'x', image.height);
+    } catch (imageError) {
+      console.error('Failed to load image:', imageError);
+      throw new Error('Invalid image format or corrupted image data');
+    }
 
     // Use tinyFaceDetector options with reasonable input size and score threshold
     const options = new faceapi.TinyFaceDetectorOptions({ 
@@ -51,11 +71,11 @@ async function processAndEncodeFace(imageBuffer) {
 
     // Check if detection exists and has descriptor
     if (!detection) {
-      throw new Error('No face detected in the image');
+      throw new Error('No face detected in the image. Please ensure your face is clearly visible and well-lit.');
     }
 
     if (!detection.descriptor) {
-      throw new Error('Failed to generate face descriptor');
+      throw new Error('Failed to generate face descriptor from detected face');
     }
 
     console.log('Face descriptor generated successfully');
@@ -73,20 +93,84 @@ async function compareFace(imageBuffer, storedDescriptor) {
   try {
     console.log('Starting face comparison');
     
-    // Convert stored descriptor to Float32Array if it's an array
-    let storedDesc = storedDescriptor;
-    if (Array.isArray(storedDescriptor)) {
-      storedDesc = new Float32Array(storedDescriptor);
+    // Validate inputs
+    if (!imageBuffer) {
+      throw new Error('Image buffer is required for face comparison');
     }
     
+    if (!storedDescriptor) {
+      throw new Error('Stored face descriptor is required for comparison');
+    }
+
+    // Debug: Log the stored descriptor details
+    console.log('Stored descriptor details:', {
+      type: typeof storedDescriptor,
+      isArray: Array.isArray(storedDescriptor),
+      length: storedDescriptor?.length,
+      constructor: storedDescriptor?.constructor?.name,
+      hasData: storedDescriptor?.data ? 'yes' : 'no',
+      firstFewValues: Array.isArray(storedDescriptor) ? storedDescriptor.slice(0, 5) : 'not array'
+    });
+    
+    // Convert stored descriptor to Float32Array with better handling
+    let storedDesc;
+    
+    if (Array.isArray(storedDescriptor)) {
+      // Direct array
+      if (storedDescriptor.length === 0) {
+        throw new Error('Stored face descriptor array is empty');
+      }
+      storedDesc = new Float32Array(storedDescriptor);
+    } else if (storedDescriptor.data && Array.isArray(storedDescriptor.data)) {
+      // Handle case where descriptor might be wrapped in an object
+      if (storedDescriptor.data.length === 0) {
+        throw new Error('Stored face descriptor data array is empty');
+      }
+      storedDesc = new Float32Array(storedDescriptor.data);
+    } else if (storedDescriptor instanceof Float32Array) {
+      // Already a Float32Array
+      storedDesc = storedDescriptor;
+    } else if (typeof storedDescriptor === 'string') {
+      // Handle string case (shouldn't happen with your schema but just in case)
+      try {
+        const parsed = JSON.parse(storedDescriptor);
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          throw new Error('Parsed descriptor is not a valid array');
+        }
+        storedDesc = new Float32Array(parsed);
+      } catch (parseError) {
+        throw new Error(`Failed to parse stored descriptor: ${parseError.message}`);
+      }
+    } else {
+      throw new Error(`Unsupported stored descriptor format: ${typeof storedDescriptor}`);
+    }
+    
+    // Final validation
+    if (!storedDesc || storedDesc.length === 0) {
+      throw new Error('Invalid stored face descriptor format after processing');
+    }
+
+    // Validate that all values are valid numbers
+    for (let i = 0; i < storedDesc.length; i++) {
+      if (typeof storedDesc[i] !== 'number' || isNaN(storedDesc[i])) {
+        throw new Error(`Invalid number at index ${i}: ${storedDesc[i]}`);
+      }
+    }
+    
+    console.log('Processing new face image...');
     const queryDescriptor = await processAndEncodeFace(imageBuffer);
     
-    if (!queryDescriptor || !storedDesc) {
-      throw new Error('Invalid descriptors for comparison');
+    if (!queryDescriptor) {
+      throw new Error('Failed to process face from uploaded image');
     }
     
     console.log('Query descriptor length:', queryDescriptor.length);
     console.log('Stored descriptor length:', storedDesc.length);
+    
+    // Ensure both descriptors have the same length
+    if (queryDescriptor.length !== storedDesc.length) {
+      throw new Error(`Descriptor length mismatch: query=${queryDescriptor.length}, stored=${storedDesc.length}`);
+    }
     
     const distance = faceapi.euclideanDistance(queryDescriptor, storedDesc);
     console.log('Euclidean distance:', distance);
@@ -99,7 +183,7 @@ async function compareFace(imageBuffer, storedDescriptor) {
     return {
       match,
       distance,
-      confidence: 1 - distance // Higher confidence for lower distance
+      confidence: Math.max(0, 1 - distance)
     };
     
   } catch (error) {
@@ -112,6 +196,11 @@ async function compareFace(imageBuffer, storedDescriptor) {
 async function processAndEncodeAllFaces(imageBuffer) {
   try {
     console.log('Starting multiple face detection process');
+    
+    // Validate input
+    if (!imageBuffer || imageBuffer.length === 0) {
+      throw new Error('Invalid image buffer');
+    }
     
     const image = await canvas.loadImage(imageBuffer);
     const options = new faceapi.TinyFaceDetectorOptions({ 
@@ -127,14 +216,14 @@ async function processAndEncodeAllFaces(imageBuffer) {
 
     console.log(`Found ${detections.length} faces`);
 
-    if (detections.length === 0) {
+    if (!detections || detections.length === 0) {
       throw new Error('No faces detected in the image');
     }
 
     // Return the first face's descriptor
     const firstFace = detections[0];
     if (!firstFace || !firstFace.descriptor) {
-      throw new Error('Failed to generate face descriptor');
+      throw new Error('Failed to generate face descriptor from detected face');
     }
 
     return firstFace.descriptor;
