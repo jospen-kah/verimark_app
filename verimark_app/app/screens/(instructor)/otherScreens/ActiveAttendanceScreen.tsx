@@ -31,23 +31,35 @@ const ActiveAttendanceScreen = () => {
   const [countdown, setCountdown] = useState<number>(0);
   const [token, setToken] = useState<string | null>(null);
 
-  // Sample data for checked-in students
-  const [checkedInStudents] = useState([
-    // { id: '1', name: 'John Smith', studentId: 'ST001', checkInTime: '11:05 AM' },
-    { id: '2', name: 'Emily Johnson', studentId: 'ST002', checkInTime: '11:08 AM' },
-    { id: '3', name: 'Michael Brown', studentId: 'ST003', checkInTime: '11:12 AM' },
-    { id: '4', name: 'Sarah Davis', studentId: 'ST004', checkInTime: '11:15 AM' },
-    { id: '5', name: 'David Wilson', studentId: 'ST005', checkInTime: '11:18 AM' },
-    { id: '6', name: 'Lisa Anderson', studentId: 'ST006', checkInTime: '11:20 AM' },
-    { id: '7', name: 'James Taylor', studentId: 'ST007', checkInTime: '11:22 AM' },
-    { id: '8', name: 'Maria Garcia', studentId: 'ST008', checkInTime: '11:25 AM' },
-  ]);
+  // Get sessionId from params
+  const sessionId = params.sessionId as string;
 
-  // Filter students based on search query
-  const filteredStudents = checkedInStudents.filter(student =>
-    student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    student.studentId.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Define session data type
+  interface SessionData {
+    status: 'active' | 'open' | 'closed' | 'ended';
+    checkedInCount?: number;
+    sessionId?: string;
+    startTime?: string;
+    endTime?: string;
+  }
+
+  // Define student type
+  type Student = {
+    id: string;
+    name: string;
+    studentId: string;
+    checkInTime: string;
+    totalMinutes?: number;
+    attendanceStatus?: 'present' | 'absent';
+    isCurrentlyCheckedIn?: boolean;
+  };
+
+  // Define checked-in students response type
+  interface CheckedInStudentsResponse {
+    attendanceId: string;
+    checkedInCount: number;
+    students: Student[];
+  }
 
   // Parse time string like "08:00 AM" to Date object (today)
   const parseTime = (timeStr: string) => {
@@ -69,6 +81,74 @@ const ActiveAttendanceScreen = () => {
     if (diff < 0) diff = 0;
     setCountdown(diff);
   }, [startTime, endTime]);
+
+  // Fetch session status
+  const fetchSessionStatus = async (sessionId: string, token: string): Promise<SessionData> => {
+    const res = await axios.get(
+      `http://192.168.1.172:3000/api/attendance/instructor-status/${sessionId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return res.data;
+  };
+
+  // Fetch checked-in students
+  const fetchCheckedInStudents = async (sessionId: string, token: string): Promise<CheckedInStudentsResponse> => {
+    const res = await axios.get(
+      `http://192.168.1.172:3000/api/attendance/checked-in/${sessionId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return res.data;
+  };
+
+  const { data: sessionData, refetch: refetchSession, isLoading: isLoadingSession } = useQuery({
+    queryKey: ['sessionStatus', sessionId, token] as const,
+    queryFn: async (): Promise<SessionData> => {
+      if (!sessionId || !token) throw new Error('Missing sessionId or token');
+      return fetchSessionStatus(sessionId, token);
+    },
+    enabled: !!sessionId && !!token,
+    refetchInterval: 5000, // Poll every 5 seconds for live updates
+    staleTime: 0, // Always consider data stale
+    gcTime: 0, // Don't cache the data (replaces cacheTime)
+    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+  });
+
+  const { data: checkedInStudentsData, refetch: refetchStudents, isLoading: isLoadingStudents } = useQuery({
+    queryKey: ['checkedInStudents', sessionId, token] as const,
+    queryFn: async (): Promise<CheckedInStudentsResponse> => {
+      if (!sessionId || !token) throw new Error('Missing sessionId or token');
+      return fetchCheckedInStudents(sessionId, token);
+    },
+    enabled: !!sessionId && !!token,
+    refetchInterval: 10000, // Poll every 10 seconds for student updates
+    staleTime: 0,
+    gcTime: 0, // Don't cache the data (replaces cacheTime)
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+
+  // Update local session state based on API response
+  useEffect(() => {
+    if (sessionData?.status) {
+      const isActive = sessionData.status === 'active' || sessionData.status === 'open';
+      setSessionActive(isActive);
+      
+      // If session is closed from backend, stop the countdown
+      if (!isActive) {
+        setCountdown(0);
+        setRemainingTime('00 : 00 : 00');
+      }
+    }
+  }, [sessionData]);
 
   // Timer logic for session countdown
   useEffect(() => {
@@ -93,7 +173,6 @@ const ActiveAttendanceScreen = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line
   }, [sessionActive, countdown]);
 
   // Format countdown seconds to HH : MM : SS
@@ -108,32 +187,12 @@ const ActiveAttendanceScreen = () => {
     );
   }, [countdown]);
 
-  type Student = {
-    id: string;
-    name: string;
-    studentId: string;
-    checkInTime: string;
-  };
-
-  const renderStudentItem = ({ item }: { item: Student }) => (
-    <View style={[styles.studentItem, { backgroundColor: theme.card }]}>
-      <View style={styles.studentInfo}>
-        <Text style={[styles.studentName, { color: theme.text }]}>{item.name}</Text>
-        <Text style={[styles.studentId, { color: theme.text + '99' }]}>{item.studentId}</Text>
-      </View>
-      <Text style={styles.checkInTime}>{item.checkInTime}</Text>
-    </View>
-  );
-
-  // Get sessionId from params
-  const sessionId = params.sessionId as string;
-
   // Mutation to end the session
   const endSessionMutation = useMutation({
     mutationFn: async () => {
       const token = await SecureStore.getItemAsync('token');
       const res = await axios.post(
-        'http://192.168.1.107:3000/api/attendance/end-session',
+        'http://192.168.1.172:3000/api/attendance/end-session',
         { attendanceId: sessionId },
         {
           headers: {
@@ -146,10 +205,19 @@ const ActiveAttendanceScreen = () => {
     onSuccess: () => {
       setSessionActive(false);
       setRemainingTime('00 : 00 : 00');
-      Alert.alert('Session Ended', 'The attendance session has ended.', [
+      // Force refetch session status to update UI immediately
+      refetchSession();
+      refetchStudents();
+      
+      // Also invalidate any related queries in the cache
+      setTimeout(() => {
+        refetchSession();
+        refetchStudents();
+      }, 100);
+      
+      Alert.alert('Session Ended', 'The attendance session has ended successfully.', [
         {
           text: 'OK',
-          onPress: () => router.back(),
         },
       ]);
     },
@@ -158,10 +226,19 @@ const ActiveAttendanceScreen = () => {
         'Failed to End Session',
         error?.response?.data?.message || 'An error occurred. Please try again.'
       );
+      // Refetch to ensure we have the latest status even on error
+      refetchSession();
+      refetchStudents();
     },
   });
 
   const handleEndSession = () => {
+    // First verify if session is still active
+    if (!sessionActive || sessionData?.status === 'closed' || sessionData?.status === 'ended') {
+      Alert.alert('Session Already Ended', 'This attendance session has already been closed.');
+      return;
+    }
+
     Alert.alert(
       'End Session',
       'Are you sure you want to end the attendance session?',
@@ -178,39 +255,65 @@ const ActiveAttendanceScreen = () => {
     );
   };
 
-  // Fetch session status
-  const fetchSessionStatus = async (sessionId: string, token: string) => {
-    const res = await axios.get(
-      `http://192.168.1.107:3000/api/attendance/session-status/${sessionId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-    return res.data;
-  };
-
-  const { data: sessionData, refetch: refetchSession } = useQuery({
-    queryKey: ['sessionStatus', sessionId, token],
-    queryFn: () => fetchSessionStatus(sessionId, token!),
-    enabled: !!sessionId && !!token,
-    refetchInterval: 5000, // Optionally poll every 5 seconds for live updates
-  });
-
   useEffect(() => {
     SecureStore.getItemAsync('token').then(setToken);
   }, []);
 
   useFocusEffect(
     React.useCallback(() => {
-      refetchSession();
-    }, [refetchSession])
+      // Force refetch when screen comes into focus
+      if (sessionId && token) {
+        refetchSession();
+        refetchStudents();
+      }
+    }, [refetchSession, refetchStudents, sessionId, token])
   );
 
-  if (!sessionActive) {
-    return null;
-  }
+  // Also refetch when component mounts
+  useEffect(() => {
+    if (sessionId && token) {
+      refetchSession();
+      refetchStudents();
+    }
+  }, [sessionId, token, refetchSession, refetchStudents]);
+
+  // Filter students based on search query
+  const filteredStudents = (checkedInStudentsData?.students || []).filter((student: Student) =>
+    student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    student.studentId.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Determine button state based on session status
+  const isSessionClosed = sessionData?.status === 'closed' || sessionData?.status === 'ended' || !sessionActive;
+  const buttonText = isSessionClosed ? 'Session Ended' : 'End Session';
+  const buttonDisabled = isSessionClosed || endSessionMutation.isPending || isLoadingSession;
+
+  const renderStudentItem = ({ item }: { item: Student }) => (
+    <View style={[styles.studentItem, { backgroundColor: theme.card }]}>
+      <View style={styles.studentInfo}>
+        <Text style={[styles.studentName, { color: theme.text }]}>{item.name}</Text>
+        <Text style={[styles.studentId, { color: theme.text + '99' }]}>{item.studentId}</Text>
+        {item.totalMinutes !== undefined && (
+          <Text style={[styles.totalTime, { color: theme.text + '99' }]}>
+            Total: {Math.floor(item.totalMinutes / 60)}h {item.totalMinutes % 60}m
+          </Text>
+        )}
+      </View>
+      <View style={styles.checkInInfo}>
+        <Text style={styles.checkInTime}>{item.checkInTime}</Text>
+        {item.attendanceStatus && (
+          <View style={[
+            styles.statusBadge,
+            { backgroundColor: item.attendanceStatus === 'present' ? '#34C759' : '#FF9500' }
+          ]}>
+            <Text style={styles.statusText}>
+              {item.attendanceStatus === 'present' ? 'Present' : 'Partial'}
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -221,7 +324,9 @@ const ActiveAttendanceScreen = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: '#007AFF' }]}>Active Attendance Session</Text>
+        <Text style={[styles.headerTitle, { color: '#007AFF' }]}>
+          {isSessionClosed ? 'Ended Attendance Session' : 'Active Attendance Session'}
+        </Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -233,13 +338,17 @@ const ActiveAttendanceScreen = () => {
         <Text style={[styles.courseDetails, { color: theme.text + '99' }]}>
           Hall: {selectedHall?.name ?? ''}, {selectedHall?.description ?? ''}, {startTime} - {endTime}
         </Text>
-        <Text style={[styles.sessionStatus, { color: theme.text + '99' }]}>Session active for {remainingTime}</Text>
+        <Text style={[styles.sessionStatus, { color: isSessionClosed ? '#FF3B30' : theme.text + '99' }]}>
+          {isSessionClosed ? 'Session has ended' : `Session active for ${remainingTime}`}
+        </Text>
       </View>
 
       {/* Stats */}
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: theme.text }]}>32</Text>
+          <Text style={[styles.statNumber, { color: theme.text }]}>
+            {isLoadingStudents ? '...' : (checkedInStudentsData?.checkedInCount || 0)}
+          </Text>
           <Text style={[styles.statLabel, { color: theme.text + '99' }]}>Checked-in</Text>
         </View>
       </View>
@@ -249,13 +358,13 @@ const ActiveAttendanceScreen = () => {
         <TouchableOpacity
           style={[
             styles.endSessionButton,
-            (sessionData?.status === 'closed' || !sessionActive) && { backgroundColor: '#8E8E93' },
+            buttonDisabled && { backgroundColor: '#8E8E93' },
           ]}
           onPress={handleEndSession}
-          disabled={sessionData?.status === 'closed' || !sessionActive}
+          disabled={buttonDisabled}
         >
           <Text style={styles.endSessionButtonText}>
-            {sessionData?.status === 'closed' || !sessionActive ? 'Session Closed' : 'End Session'}
+            {endSessionMutation.isPending ? 'Ending...' : buttonText}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -299,7 +408,12 @@ const ActiveAttendanceScreen = () => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={[styles.emptyText, { color: theme.text + '99' }]}>
-                {searchQuery ? 'No students found matching your search' : 'No students checked in yet'}
+                {isLoadingStudents 
+                  ? 'Loading students...' 
+                  : searchQuery 
+                    ? 'No students found matching your search' 
+                    : 'No students checked in yet'
+                }
               </Text>
             </View>
           }
@@ -312,7 +426,7 @@ const ActiveAttendanceScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff', // will be overridden by theme
+    backgroundColor: '#fff',
     paddingTop: StatusBar.currentHeight || 0,
   },
   header: {
@@ -320,9 +434,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    // paddingTop: 60,
     paddingBottom: 16,
-    backgroundColor: '#fff', // will be overridden by theme
+    backgroundColor: '#fff',
   },
   backButton: {
     padding: 4,
@@ -342,17 +455,17 @@ const styles = StyleSheet.create({
   courseCode: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000', // will be overridden by theme
+    color: '#000',
     marginBottom: 4,
   },
   courseDetails: {
     fontSize: 14,
-    color: '#8E8E93', // will be overridden by theme
+    color: '#8E8E93',
     marginBottom: 8,
   },
   sessionStatus: {
     fontSize: 12,
-    color: '#8E8E93', // will be overridden by theme
+    color: '#8E8E93',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -366,12 +479,12 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#000', // will be overridden by theme
+    color: '#000',
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 14,
-    color: '#8E8E93', // will be overridden by theme
+    color: '#8E8E93',
   },
   buttonRow: {
     flexDirection: 'row',
@@ -412,7 +525,7 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7', // will be overridden by theme
+    backgroundColor: '#F2F2F7',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -423,7 +536,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#000', // will be overridden by theme
+    color: '#000',
     paddingVertical: 4,
   },
   studentsContainer: {
@@ -433,7 +546,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000', // will be overridden by theme
+    color: '#000',
     marginBottom: 12,
   },
   listContainer: {
@@ -445,7 +558,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#F8F9FA', // will be overridden by theme
+    backgroundColor: '#F8F9FA',
     borderRadius: 8,
     marginBottom: 8,
   },
@@ -455,17 +568,36 @@ const styles = StyleSheet.create({
   studentName: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#000', // will be overridden by theme
+    color: '#000',
     marginBottom: 2,
   },
   studentId: {
     fontSize: 14,
-    color: '#8E8E93', // will be overridden by theme
+    color: '#8E8E93',
+  },
+  totalTime: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 2,
+  },
+  checkInInfo: {
+    alignItems: 'flex-end',
   },
   checkInTime: {
     fontSize: 14,
     color: '#34C759',
     fontWeight: '500',
+    marginBottom: 4,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '600',
   },
   emptyContainer: {
     paddingVertical: 40,
@@ -473,7 +605,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#8E8E93', // will be overridden by theme
+    color: '#8E8E93',
     textAlign: 'center',
   },
 });

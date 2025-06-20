@@ -6,7 +6,7 @@ const Hall = require('../models/Hall');
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const Course = require('../models/Course');
-const { compareFace } = require('../services/face.service');
+const { compareFace, ensureModelsLoaded } = require('../services/face.service');
 
 
 // Initiate attendance session
@@ -80,6 +80,421 @@ exports.verifyGeofence = async (req, res) => {
 
 const FaceData = require('../models/FaceData'); // Make sure to import your FaceData model
 
+// exports.checkIn = async (req, res) => {
+//   try {
+//     console.log('=== CHECK-IN CONTROLLER START ===');
+//     console.log('Request timestamp:', new Date().toISOString());
+    
+//     const { latitude, longitude, attendanceId } = req.body;
+    
+//     // Debug logging
+//     console.log('Request body:', req.body);
+//     console.log('User ID:', req.user?._id);
+//     console.log('File received:', !!req.file);
+    
+//     // Validate required fields
+//     if (!attendanceId) {
+//       console.log('❌ Missing attendanceId');
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Attendance session ID is required' 
+//       });
+//     }
+
+//     if (!latitude || !longitude) {
+//       console.log('❌ Missing coordinates');
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Location coordinates are required' 
+//       });
+//     }
+
+//     // Check if face image is uploaded
+//     if (!req.file) {
+//       console.log('❌ No file uploaded');
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Face image is required for check-in' 
+//       });
+//     }
+
+//     // Enhanced file validation
+//     console.log('=== FILE VALIDATION ===');
+//     console.log('File fieldname:', req.file.fieldname);
+//     console.log('File originalname:', req.file.originalname);
+//     console.log('File mimetype:', req.file.mimetype);
+//     console.log('File size:', req.file.size);
+    
+//     // Validate file type
+//     const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+//     if (!allowedMimeTypes.includes(req.file.mimetype)) {
+//       console.log('❌ Invalid file type:', req.file.mimetype);
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Invalid image format. Please upload JPEG, PNG, or WebP images only.' 
+//       });
+//     }
+    
+//     // Validate file size (max 10MB)
+//     const maxSize = 10 * 1024 * 1024; // 10MB
+//     if (req.file.size > maxSize) {
+//       console.log('❌ File too large:', req.file.size);
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Image file too large. Maximum size is 10MB.' 
+//       });
+//     }
+    
+//     // Validate minimum file size (at least 1KB)
+//     if (req.file.size < 1024) {
+//       console.log('❌ File too small:', req.file.size);
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Image file too small. Please upload a valid image.' 
+//       });
+//     }
+
+//     console.log('✅ File validation passed');
+
+//     // Ensure face recognition models are loaded
+//     try {
+//       console.log('Ensuring face recognition models are loaded...');
+//       await ensureModelsLoaded();
+//       console.log('✅ Face recognition models ready');
+//     } catch (modelError) {
+//       console.error('❌ Face model loading error:', modelError);
+//       return res.status(500).json({ 
+//         success: false,
+//         message: 'Face recognition system not available. Please try again later.' 
+//       });
+//     }
+
+//     // Find attendance session
+//     const session = await Attendance.findOne({ _id: attendanceId, status: 'open' })
+//       .populate('hallId');
+
+//     if (!session) {
+//       console.log('❌ No active session found');
+//       return res.status(404).json({ 
+//         success: false,
+//         message: 'No active session found for this ID' 
+//       });
+//     }
+
+//     console.log('✅ Attendance session found:', session._id);
+//     const hall = session.hallId;
+
+//     // Get altitude from external API
+//     console.log('Getting elevation for coordinates:', { latitude, longitude });
+//     const altitude = await getElevation(latitude, longitude);
+//     console.log(`Altitude for coordinates (${latitude}, ${longitude}): ${altitude}`);
+
+//     // Validate geofence including altitude
+//     console.log('Validating geofence...');
+//     const isInside = isInsidePolygonWithAltitude(
+//       { latitude: parseFloat(latitude), longitude: parseFloat(longitude), altitude },
+//       hall.coordinates,
+//       hall.minAltitude,
+//       hall.maxAltitude
+//     );
+
+//     console.log(`Point ${latitude}, ${longitude} with altitude ${altitude} is inside polygon:`, isInside);
+
+//     if (!isInside) {
+//       console.log('❌ Not inside geofence');
+//       return res.status(403).json({ 
+//         success: false,
+//         message: 'You are not in the hall geofence' 
+//       });
+//     }
+
+//     console.log('✅ Geofence validation passed');
+
+//     // Check if student already checked in for this session
+//     const existingLog = await AttendanceLog.findOne({
+//       attendanceId: session._id,
+//       studentId: req.user._id
+//     });
+
+//     if (existingLog) {
+//       console.log('❌ User already checked in');
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'You have already checked in for this session' 
+//       });
+//     }
+
+//     console.log('✅ No existing check-in found');
+
+//     // Retrieve and validate face data from FaceData collection
+//     console.log('Retrieving face data for student:', req.user._id);
+//     const faceDataDoc = await FaceData.findOne({ studentId: req.user._id });
+    
+//     if (!faceDataDoc) {
+//       console.log('❌ No face data document found');
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'No face data registered for this user. Please register your face first.' 
+//       });
+//     }
+
+//     // Enhanced face data validation
+//     console.log('=== FACE DATA VALIDATION ===');
+//     console.log('Face data document ID:', faceDataDoc._id);
+//     console.log('Face data exists:', !!faceDataDoc.faceData);
+//     console.log('Face data type:', typeof faceDataDoc.faceData);
+//     console.log('Face data is array:', Array.isArray(faceDataDoc.faceData));
+//     console.log('Face data length:', faceDataDoc.faceData?.length);
+    
+//     if (!faceDataDoc.faceData || !Array.isArray(faceDataDoc.faceData)) {
+//       console.log('❌ Invalid face data format - not an array');
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Invalid face data format. Please re-register your face.' 
+//       });
+//     }
+    
+//     if (faceDataDoc.faceData.length !== 128) {
+//       console.log('❌ Invalid face data length:', faceDataDoc.faceData.length);
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Invalid face data format. Please re-register your face.' 
+//       });
+//     }
+    
+//     // Check for invalid values in face data
+//     const hasInvalidValues = faceDataDoc.faceData.some(val => 
+//       typeof val !== 'number' || isNaN(val) || !isFinite(val)
+//     );
+    
+//     if (hasInvalidValues) {
+//       console.log('❌ Face data contains invalid values');
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Corrupted face data. Please re-register your face.' 
+//       });
+//     }
+
+//     // ENHANCED: Additional face data validation using service
+//     const { validateStoredFaceData } = require('../services/face.service');
+//     const validation = validateStoredFaceData(faceDataDoc.faceData);
+//     if (!validation.valid) {
+//       console.log('❌ Face data validation failed:', validation.error);
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Invalid stored face data. Please re-register your face.' 
+//       });
+//     }
+
+//     console.log('✅ Face data validation passed');
+//     console.log('Face data sample:', faceDataDoc.faceData.slice(0, 5));
+
+//     // Get and validate image buffer
+//     let imageBuffer;
+    
+//     try {
+//       if (req.file.buffer) {
+//         // Memory storage
+//         console.log('Using memory storage buffer');
+//         imageBuffer = req.file.buffer;
+//       } else if (req.file.path) {
+//         // Disk storage - read file
+//         console.log('Reading file from disk storage:', req.file.path);
+//         const fs = require('fs');
+//         imageBuffer = fs.readFileSync(req.file.path);
+//         console.log('✅ File read from disk, buffer length:', imageBuffer.length);
+        
+//         // Clean up file after reading
+//         fs.unlinkSync(req.file.path);
+//         console.log('✅ Temporary file cleaned up');
+//       } else {
+//         throw new Error('No buffer or path available in uploaded file');
+//       }
+//     } catch (fileError) {
+//       console.error('❌ Error processing uploaded file:', fileError);
+//       return res.status(500).json({ 
+//         success: false,
+//         message: 'Error processing uploaded image' 
+//       });
+//     }
+
+//     // Final image buffer validation
+//     if (!imageBuffer || !Buffer.isBuffer(imageBuffer) || imageBuffer.length === 0) {
+//       console.log('❌ Invalid image buffer');
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Invalid image data received' 
+//       });
+//     }
+
+//     console.log('✅ Image buffer ready, length:', imageBuffer.length);
+
+//     // Perform face verification with enhanced error handling
+//     let faceVerificationResult;
+//     try {
+//       console.log('=== FACE VERIFICATION START ===');
+//       console.log('Starting face comparison...');
+//       console.log('Image buffer length:', imageBuffer.length);
+//       console.log('Stored face data length:', faceDataDoc.faceData.length);
+      
+//       // Call the enhanced compareFace function
+//       faceVerificationResult = await compareFace(imageBuffer, faceDataDoc.faceData);
+      
+//       console.log('=== FACE VERIFICATION RESULT ===');
+//       console.log('Verification completed successfully');
+//       console.log('Result:', JSON.stringify(faceVerificationResult, null, 2));
+      
+//     } catch (faceError) {
+//       console.error('❌ Face verification error:', faceError);
+//       console.error('Face error stack:', faceError.stack);
+      
+//       // Provide more specific error messages based on error type
+//       let errorMessage = 'Face verification failed due to technical error';
+      
+//       if (faceError.message.includes('No face detected')) {
+//         errorMessage = 'No face detected in the image. Please ensure your face is clearly visible and well-lit.';
+//       } else if (faceError.message.includes('Image too small')) {
+//         errorMessage = 'Image resolution too low for face detection. Please use a higher quality image.';
+//       } else if (faceError.message.includes('Image too large')) {
+//         errorMessage = 'Image file too large for processing. Please use a smaller image.';
+//       } else if (faceError.message.includes('Invalid image format')) {
+//         errorMessage = 'Invalid or corrupted image. Please try with a different image.';
+//       } else if (faceError.message.includes('descriptor')) {
+//         errorMessage = 'Face processing failed. Please try again or re-register your face.';
+//       }
+      
+//       return res.status(500).json({ 
+//         success: false,
+//         message: errorMessage,
+//         error: process.env.NODE_ENV === 'development' ? faceError.message : undefined
+//       });
+//     }
+
+//     // CRITICAL: Stricter validation
+//     if (!faceVerificationResult || typeof faceVerificationResult !== 'object') {
+//       console.log('❌ Invalid face verification result format');
+//       return res.status(500).json({ 
+//         success: false,
+//         message: 'Face verification system error' 
+//       });
+//     }
+
+//     // Enhanced match validation
+//     const isMatch = faceVerificationResult.match === true;
+//     const confidence = faceVerificationResult.confidence || 0;
+//     const distance = faceVerificationResult.distance || 1;
+//     const matchQuality = faceVerificationResult.matchQuality || 'unknown';
+
+//     // ADDITIONAL SECURITY: Multiple validation checks
+//     const validMatch = isMatch && 
+//                       confidence >= 0.3 && 
+//                       distance < 0.4 && 
+//                       faceVerificationResult.matchQuality !== 'no_match';
+
+//     console.log('=== ENHANCED FACE MATCH ANALYSIS ===');
+//     console.log('Face Match:', isMatch);
+//     console.log('Confidence:', (confidence * 100).toFixed(2) + '%');
+//     console.log('Distance:', distance.toFixed(4));
+//     console.log('Match Quality:', matchQuality);
+//     console.log('Valid Match (Enhanced):', validMatch);
+
+//     if (!validMatch) {
+//       console.log('❌ Face verification failed - enhanced validation');
+//       console.log('Match:', isMatch, 'Confidence:', confidence, 'Distance:', distance);
+      
+//       // Provide different messages based on match quality and confidence
+//       let rejectionMessage = 'Face verification failed. Access denied.';
+      
+//       if (matchQuality === 'poor' || matchQuality === 'no_match') {
+//         rejectionMessage = 'Face verification failed. The image quality might be too low or lighting conditions poor. Please try again with better lighting.';
+//       } else if (confidence < 0.3) {
+//         rejectionMessage = 'Face verification failed. Confidence level too low. Please ensure you are the registered user and try again.';
+//       } else if (distance >= 0.4) {
+//         rejectionMessage = 'Face verification failed. Face does not match registered profile closely enough.';
+//       }
+      
+//       return res.status(403).json({ 
+//         success: false,
+//         message: rejectionMessage,
+//         details: process.env.NODE_ENV === 'development' ? {
+//           confidence: confidence,
+//           distance: distance,
+//           matchQuality: matchQuality,
+//           isMatch: isMatch,
+//           validMatch: validMatch
+//         } : undefined
+//       });
+//     }
+
+//     console.log('✅ Enhanced face verification successful');
+
+//     // Create check-in log with verification details
+//     console.log('Creating attendance log...');
+//     const log = new AttendanceLog({
+//       attendanceId: session._id,
+//       studentId: req.user._id,
+//       checkInTime: new Date(),
+//       faceVerified: true,
+//       faceVerificationDetails: {
+//         confidence: confidence,
+//         distance: distance,
+//         matchQuality: matchQuality,
+//         timestamp: faceVerificationResult.timestamp,
+//         enhancedValidation: true // Flag to indicate enhanced validation was used
+//       },
+//       location: {
+//         latitude: parseFloat(latitude),
+//         longitude: parseFloat(longitude),
+//         altitude: altitude
+//       }
+//     });
+
+//     await log.save();
+//     console.log('✅ Attendance log saved:', log._id);
+
+//     console.log('=== CHECK-IN SUCCESSFUL ===');
+    
+//     res.status(200).json({ 
+//       success: true,
+//       message: 'Check-in logged successfully with enhanced face verification', 
+//       log: {
+//         id: log._id,
+//         checkInTime: log.checkInTime,
+//         faceVerified: log.faceVerified,
+//         confidence: (confidence * 100).toFixed(1) + '%',
+//         matchQuality: matchQuality,
+//         location: log.location,
+//         enhancedSecurity: true
+//       }
+//     });
+
+//   } catch (err) {
+//     console.error('❌ CHECK-IN CONTROLLER ERROR:', err);
+//     console.error('Error stack:', err.stack);
+    
+//     // Clean up uploaded file in case of error (disk storage)
+//     if (req.file && req.file.path) {
+//       try {
+//         const fs = require('fs');
+//         if (fs.existsSync(req.file.path)) {
+//           fs.unlinkSync(req.file.path);
+//           console.log('✅ Cleaned up temporary file after error');
+//         }
+//       } catch (cleanupError) {
+//         console.error('❌ File cleanup error:', cleanupError);
+//       }
+//     }
+    
+//     res.status(500).json({ 
+//       success: false,
+//       message: 'Server error during check-in',
+//       error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+//     });
+//   }
+// };
+
+// Check-out controller
+
 exports.checkIn = async (req, res) => {
   try {
     console.log('=== CHECK-IN CONTROLLER START ===');
@@ -118,16 +533,56 @@ exports.checkIn = async (req, res) => {
       });
     }
 
-    // Detailed file debugging
-    console.log('=== FILE DEBUG INFO ===');
+    // Enhanced file validation
+    console.log('=== FILE VALIDATION ===');
     console.log('File fieldname:', req.file.fieldname);
     console.log('File originalname:', req.file.originalname);
     console.log('File mimetype:', req.file.mimetype);
     console.log('File size:', req.file.size);
-    console.log('File buffer exists:', !!req.file.buffer);
-    console.log('File buffer length:', req.file.buffer?.length);
-    console.log('File path exists:', !!req.file.path);
-    console.log('=== END FILE DEBUG ===');
+    
+    // Validate file type
+    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      console.log('❌ Invalid file type:', req.file.mimetype);
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid image format. Please upload JPEG, PNG, or WebP images only.' 
+      });
+    }
+    
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (req.file.size > maxSize) {
+      console.log('❌ File too large:', req.file.size);
+      return res.status(400).json({ 
+        success: false,
+        message: 'Image file too large. Maximum size is 10MB.' 
+      });
+    }
+    
+    // Validate minimum file size (at least 1KB)
+    if (req.file.size < 1024) {
+      console.log('❌ File too small:', req.file.size);
+      return res.status(400).json({ 
+        success: false,
+        message: 'Image file too small. Please upload a valid image.' 
+      });
+    }
+
+    console.log('✅ File validation passed');
+
+    // Ensure face recognition models are loaded
+    try {
+      console.log('Ensuring face recognition models are loaded...');
+      await ensureModelsLoaded();
+      console.log('✅ Face recognition models ready');
+    } catch (modelError) {
+      console.error('❌ Face model loading error:', modelError);
+      return res.status(500).json({ 
+        success: false,
+        message: 'Face recognition system not available. Please try again later.' 
+      });
+    }
 
     // Find attendance session
     const session = await Attendance.findOne({ _id: attendanceId, status: 'open' })
@@ -186,7 +641,7 @@ exports.checkIn = async (req, res) => {
 
     console.log('✅ No existing check-in found');
 
-    // Retrieve face data from FaceData collection
+    // Retrieve and validate face data from FaceData collection
     console.log('Retrieving face data for student:', req.user._id);
     const faceDataDoc = await FaceData.findOne({ studentId: req.user._id });
     
@@ -198,132 +653,210 @@ exports.checkIn = async (req, res) => {
       });
     }
 
-    // Debug the retrieved face data
-    console.log('=== FACE DATA DEBUG INFO ===');
-    console.log('Face data document found:', !!faceDataDoc);
-    console.log('Face data array exists:', !!faceDataDoc.faceData);
+    // Enhanced face data validation
+    console.log('=== FACE DATA VALIDATION ===');
+    console.log('Face data document ID:', faceDataDoc._id);
+    console.log('Face data exists:', !!faceDataDoc.faceData);
     console.log('Face data type:', typeof faceDataDoc.faceData);
     console.log('Face data is array:', Array.isArray(faceDataDoc.faceData));
     console.log('Face data length:', faceDataDoc.faceData?.length);
-    console.log('Face data sample (first 5):', faceDataDoc.faceData?.slice(0, 5));
-    console.log('Has NaN values:', faceDataDoc.faceData?.some(val => isNaN(val)));
-    console.log('All are numbers:', faceDataDoc.faceData?.every(val => typeof val === 'number'));
-    console.log('=== END FACE DATA DEBUG ===');
-
-    // Validate face data
-    if (!faceDataDoc.faceData || !Array.isArray(faceDataDoc.faceData) || faceDataDoc.faceData.length === 0) {
-      console.log('❌ Invalid face data format');
+    
+    if (!faceDataDoc.faceData || !Array.isArray(faceDataDoc.faceData)) {
+      console.log('❌ Invalid face data format - not an array');
       return res.status(400).json({ 
         success: false,
         message: 'Invalid face data format. Please re-register your face.' 
       });
     }
+    
+    if (faceDataDoc.faceData.length !== 128) {
+      console.log('❌ Invalid face data length:', faceDataDoc.faceData.length);
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid face data format. Please re-register your face.' 
+      });
+    }
+    
+    // Check for invalid values in face data
+    const hasInvalidValues = faceDataDoc.faceData.some(val => 
+      typeof val !== 'number' || isNaN(val) || !isFinite(val)
+    );
+    
+    if (hasInvalidValues) {
+      console.log('❌ Face data contains invalid values');
+      return res.status(400).json({ 
+        success: false,
+        message: 'Corrupted face data. Please re-register your face.' 
+      });
+    }
+
+    // ENHANCED: Additional face data validation using service
+    const { validateStoredFaceData } = require('../services/face.service');
+    const validation = validateStoredFaceData(faceDataDoc.faceData);
+    if (!validation.valid) {
+      console.log('❌ Face data validation failed:', validation.error);
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid stored face data. Please re-register your face.' 
+      });
+    }
 
     console.log('✅ Face data validation passed');
+    console.log('Face data sample:', faceDataDoc.faceData.slice(0, 5));
 
-    // Get image buffer (handle both memory and disk storage)
+    // Get and validate image buffer
     let imageBuffer;
     
-    if (req.file.buffer) {
-      // Memory storage
-      console.log('Using memory storage buffer');
-      imageBuffer = req.file.buffer;
-    } else if (req.file.path) {
-      // Disk storage - read file
-      console.log('Reading file from disk storage:', req.file.path);
-      const fs = require('fs');
-      try {
+    try {
+      if (req.file.buffer) {
+        // Memory storage
+        console.log('Using memory storage buffer');
+        imageBuffer = req.file.buffer;
+      } else if (req.file.path) {
+        // Disk storage - read file
+        console.log('Reading file from disk storage:', req.file.path);
+        const fs = require('fs');
         imageBuffer = fs.readFileSync(req.file.path);
         console.log('✅ File read from disk, buffer length:', imageBuffer.length);
         
         // Clean up file after reading
         fs.unlinkSync(req.file.path);
         console.log('✅ Temporary file cleaned up');
-      } catch (fileError) {
-        console.error('❌ Error reading file from disk:', fileError);
-        return res.status(500).json({ 
-          success: false,
-          message: 'Error processing uploaded image' 
-        });
+      } else {
+        throw new Error('No buffer or path available in uploaded file');
       }
-    } else {
-      console.log('❌ No buffer or path available');
-      return res.status(400).json({ 
+    } catch (fileError) {
+      console.error('❌ Error processing uploaded file:', fileError);
+      return res.status(500).json({ 
         success: false,
-        message: 'Invalid face image data - no buffer or file path available' 
+        message: 'Error processing uploaded image' 
       });
     }
 
-    // Validate image buffer
-    if (!imageBuffer || imageBuffer.length === 0) {
-      console.log('❌ Empty image buffer');
+    // Final image buffer validation
+    if (!imageBuffer || !Buffer.isBuffer(imageBuffer) || imageBuffer.length === 0) {
+      console.log('❌ Invalid image buffer');
       return res.status(400).json({ 
         success: false,
-        message: 'Invalid or empty face image data' 
+        message: 'Invalid image data received' 
       });
     }
 
     console.log('✅ Image buffer ready, length:', imageBuffer.length);
 
-    // Perform face verification
+    // Perform face verification with enhanced error handling
+    let faceVerificationResult;
     try {
       console.log('=== FACE VERIFICATION START ===');
-      console.log('Calling compareFace function...');
+      console.log('Starting face comparison...');
       console.log('Image buffer length:', imageBuffer.length);
       console.log('Stored face data length:', faceDataDoc.faceData.length);
       
-      // Pass the actual faceData array from the FaceData document
-      const faceMatch = await compareFace(imageBuffer, faceDataDoc.faceData);
-      console.log('Face verification result:', faceMatch);
-      console.log('=== FACE VERIFICATION END ===');
+      // Call the enhanced compareFace function
+      faceVerificationResult = await compareFace(imageBuffer, faceDataDoc.faceData);
       
-      // Check if faceMatch is a boolean or an object with match property
-      let isMatch;
-      if (typeof faceMatch === 'boolean') {
-        isMatch = faceMatch;
-      } else if (faceMatch && typeof faceMatch === 'object' && 'match' in faceMatch) {
-        isMatch = faceMatch.match;
-      } else {
-        throw new Error('Invalid face verification result format');
-      }
-      
-      if (!isMatch) {
-        console.log('❌ Face verification failed');
-        return res.status(403).json({ 
-          success: false,
-          message: 'Face verification failed. Access denied.',
-          faceResult: faceMatch // Include details for debugging
-        });
-      }
-      
-      console.log('✅ Face verification successful');
+      console.log('=== FACE VERIFICATION RESULT ===');
+      console.log('Verification completed successfully');
+      console.log('Result:', JSON.stringify(faceVerificationResult, null, 2));
       
     } catch (faceError) {
       console.error('❌ Face verification error:', faceError);
       console.error('Face error stack:', faceError.stack);
       
-      // Additional debugging for face errors
-      console.log('=== FACE ERROR DEBUG ===');
-      console.log('Error message:', faceError.message);
-      console.log('Error name:', faceError.name);
-      console.log('Image buffer valid:', !!imageBuffer && imageBuffer.length > 0);
-      console.log('Face data valid:', !!faceDataDoc.faceData && Array.isArray(faceDataDoc.faceData));
-      console.log('=== END FACE ERROR DEBUG ===');
+      // Provide more specific error messages based on error type
+      let errorMessage = 'Face verification failed due to technical error';
+      
+      if (faceError.message.includes('No face detected')) {
+        errorMessage = 'No face detected in the image. Please ensure your face is clearly visible and well-lit.';
+      } else if (faceError.message.includes('Image too small')) {
+        errorMessage = 'Image resolution too low for face detection. Please use a higher quality image.';
+      } else if (faceError.message.includes('Image too large')) {
+        errorMessage = 'Image file too large for processing. Please use a smaller image.';
+      } else if (faceError.message.includes('Invalid image format')) {
+        errorMessage = 'Invalid or corrupted image. Please try with a different image.';
+      } else if (faceError.message.includes('descriptor')) {
+        errorMessage = 'Face processing failed. Please try again or re-register your face.';
+      }
       
       return res.status(500).json({ 
         success: false,
-        message: 'Face verification failed due to technical error',
-        error: process.env.NODE_ENV === 'development' ? faceError.message : 'Face verification error'
+        message: errorMessage,
+        error: process.env.NODE_ENV === 'development' ? faceError.message : undefined
       });
     }
 
-    // Create check-in log
+    // CRITICAL: Stricter validation
+    if (!faceVerificationResult || typeof faceVerificationResult !== 'object') {
+      console.log('❌ Invalid face verification result format');
+      return res.status(500).json({ 
+        success: false,
+        message: 'Face verification system error' 
+      });
+    }
+
+    // Enhanced match validation
+    const isMatch = faceVerificationResult.match === true;
+    const confidence = faceVerificationResult.confidence || 0;
+    const distance = faceVerificationResult.distance || 1;
+    const matchQuality = faceVerificationResult.matchQuality || 'unknown';
+
+    // ADDITIONAL SECURITY: Multiple validation checks
+    const validMatch = isMatch && 
+                      confidence >= 0.3 && 
+                      distance < 0.4 && 
+                      faceVerificationResult.matchQuality !== 'no_match';
+
+    console.log('=== ENHANCED FACE MATCH ANALYSIS ===');
+    console.log('Face Match:', isMatch);
+    console.log('Confidence:', (confidence * 100).toFixed(2) + '%');
+    console.log('Distance:', distance.toFixed(4));
+    console.log('Match Quality:', matchQuality);
+    console.log('Valid Match (Enhanced):', validMatch);
+
+    if (!validMatch) {
+      console.log('❌ Face verification failed - enhanced validation');
+      console.log('Match:', isMatch, 'Confidence:', confidence, 'Distance:', distance);
+      
+      // Provide different messages based on match quality and confidence
+      let rejectionMessage = 'Face verification failed. Access denied.';
+      
+      if (matchQuality === 'poor' || matchQuality === 'no_match') {
+        rejectionMessage = 'Face verification failed. The image quality might be too low or lighting conditions poor. Please try again with better lighting.';
+      } else if (confidence < 0.3) {
+        rejectionMessage = 'Face verification failed. Confidence level too low. Please ensure you are the registered user and try again.';
+      } else if (distance >= 0.4) {
+        rejectionMessage = 'Face verification failed. Face does not match registered profile closely enough.';
+      }
+      
+      return res.status(403).json({ 
+        success: false,
+        message: rejectionMessage,
+        details: process.env.NODE_ENV === 'development' ? {
+          confidence: confidence,
+          distance: distance,
+          matchQuality: matchQuality,
+          isMatch: isMatch,
+          validMatch: validMatch
+        } : undefined
+      });
+    }
+
+    console.log('✅ Enhanced face verification successful');
+
+    // Create check-in log with verification details
     console.log('Creating attendance log...');
     const log = new AttendanceLog({
       attendanceId: session._id,
       studentId: req.user._id,
       checkInTime: new Date(),
       faceVerified: true,
+      faceVerificationDetails: {
+        confidence: confidence,
+        distance: distance,
+        matchQuality: matchQuality,
+        timestamp: faceVerificationResult.timestamp,
+        enhancedValidation: true // Flag to indicate enhanced validation was used
+      },
       location: {
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
@@ -338,12 +871,15 @@ exports.checkIn = async (req, res) => {
     
     res.status(200).json({ 
       success: true,
-      message: 'Check-in logged successfully with face verification', 
+      message: 'Check-in logged successfully with enhanced face verification', 
       log: {
         id: log._id,
         checkInTime: log.checkInTime,
         faceVerified: log.faceVerified,
-        location: log.location
+        confidence: (confidence * 100).toFixed(1) + '%',
+        matchQuality: matchQuality,
+        location: log.location,
+        enhancedSecurity: true
       }
     });
 
@@ -355,8 +891,10 @@ exports.checkIn = async (req, res) => {
     if (req.file && req.file.path) {
       try {
         const fs = require('fs');
-        fs.unlinkSync(req.file.path);
-        console.log('✅ Cleaned up temporary file after error');
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+          console.log('✅ Cleaned up temporary file after error');
+        }
       } catch (cleanupError) {
         console.error('❌ File cleanup error:', cleanupError);
       }
@@ -370,7 +908,6 @@ exports.checkIn = async (req, res) => {
   }
 };
 
-// Check-out controller
 exports.checkOut = async (req, res) => {
   try {
     const { attendanceId, latitude, longitude } = req.body;
@@ -724,5 +1261,140 @@ exports.getAttendanceSession = async (req, res) => {
   }
 };
 
+
+// Add this new controller method to your attendance controller
+
+// const mongoose = require('mongoose');
+// const AttendanceLog = require('../models/AttendanceLog');
+
+exports.getCheckedInStudents = async (req, res) => {
+  try {
+    const { attendanceId } = req.params;
+    
+    console.log('Getting checked-in students for attendanceId:', attendanceId);
+    console.log('AttendanceId type:', typeof attendanceId);
+
+    // First, let's check if there are any logs for this attendance session
+    const totalLogs = await AttendanceLog.countDocuments({
+      attendanceId: attendanceId
+    });
+
+    console.log('Total logs found (without ObjectId conversion):', totalLogs);
+
+    let totalLogsWithObjectId = 0;
+    try {
+      totalLogsWithObjectId = await AttendanceLog.countDocuments({
+        attendanceId: new mongoose.Types.ObjectId(attendanceId)
+      });
+      console.log('Total logs found (with ObjectId conversion):', totalLogsWithObjectId);
+    } catch (objIdError) {
+      console.log('ObjectId conversion failed:', objIdError.message);
+    }
+
+    const useObjectIdConversion = totalLogsWithObjectId > totalLogs;
+    const matchCondition = useObjectIdConversion 
+      ? { attendanceId: new mongoose.Types.ObjectId(attendanceId) }
+      : { attendanceId: attendanceId };
+
+    console.log('Using match condition:', matchCondition);
+
+    const checkedInStudents = await AttendanceLog.aggregate([
+      { $match: matchCondition },
+      {
+        $group: {
+          _id: '$studentId',
+          firstCheckIn: { $min: '$checkInTime' },
+          lastCheckOut: { $max: '$checkOutTime' },
+          totalLogs: { $sum: 1 },
+          hasAnyCheckOut: {
+            $max: { $cond: [{ $ne: ['$checkOutTime', null] }, true, false] }
+          }
+        }
+      },
+      {
+        $addFields: {
+          studentObjectId: {
+            $cond: [
+              { $eq: [{ $type: '$_id' }, 'objectId'] },
+              '$_id',
+              { $toObjectId: '$_id' }
+            ]
+          }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'studentObjectId',
+          foreignField: '_id',
+          as: 'student'
+        }
+      },
+      {
+        $unwind: {
+          path: '$student',
+          preserveNullAndEmptyArrays: false
+        }
+      },
+      {
+        $project: {
+          studentId: '$_id',
+          firstName: '$student.firstName',
+          lastName: '$student.lastName',
+          matriNumber: '$student.matriNumber',
+          firstCheckIn: 1,
+          lastCheckOut: 1,
+          totalLogs: 1,
+          hasAnyCheckOut: 1,
+          fullName: {
+            $concat: ['$student.firstName', ' ', '$student.lastName']
+          }
+        }
+      },
+      {
+        $sort: { firstCheckIn: 1 }
+      }
+    ]);
+
+    console.log('Aggregation result:', JSON.stringify(checkedInStudents, null, 2));
+
+    const studentsWithSummary = checkedInStudents.map((student) => {
+      let totalMinutes = 0;
+      if (student.firstCheckIn && student.lastCheckOut) {
+        const diffMs = new Date(student.lastCheckOut) - new Date(student.firstCheckIn);
+        totalMinutes = Math.floor(diffMs / (1000 * 60));
+      }
+
+      const attendanceStatus = student.hasAnyCheckOut ? 'present' : 'present'; // placeholder
+
+      return {
+        id: student.studentId.toString(),
+        name: student.fullName,
+        studentId: student.matriNumber,
+        checkInTime: new Date(student.firstCheckIn).toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        }),
+        totalMinutes,
+        attendanceStatus,
+        isCurrentlyCheckedIn: !student.hasAnyCheckOut
+      };
+    });
+
+    console.log('Final students with summary:', studentsWithSummary.length);
+    console.log('Students data:', JSON.stringify(studentsWithSummary, null, 2));
+
+    res.status(200).json({
+      attendanceId,
+      checkedInCount: studentsWithSummary.length,
+      students: studentsWithSummary
+    });
+  } catch (err) {
+    console.error('Get checked-in students error:', err);
+    console.error('Error stack:', err.stack);
+    res.status(500).json({ message: err.message });
+  }
+};
 
 

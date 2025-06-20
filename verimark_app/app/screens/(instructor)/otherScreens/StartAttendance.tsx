@@ -93,7 +93,7 @@ const StartAttendance = () => {
   }) => {
     const token = await SecureStore.getItemAsync('token'); // Ensure you have the token stored
     const res = await axios.post(
-      'http://192.168.1.107:3000/api/attendance/initiate',
+      'http://192.168.1.172:3000/api/attendance/initiate',
       { courseId, hallId, startTime, endTime },
       {
         headers: {

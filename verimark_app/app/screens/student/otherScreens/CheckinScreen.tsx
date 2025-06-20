@@ -15,7 +15,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import axios, { AxiosError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'http://192.168.1.107:3000/api'; // Your backend URL
+const API_BASE_URL = 'http://192.168.1.172:3000/api'; // Your backend URL
 
 const CheckInScreen = () => {
   const navigation = useNavigation();

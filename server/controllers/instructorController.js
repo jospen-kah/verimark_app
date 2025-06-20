@@ -1,4 +1,4 @@
-const User = require('../models/User');
+  const User = require('../models/User');
 
 // Get all instructors waiting for approval
 const getPendingInstructors = async (req, res) => {

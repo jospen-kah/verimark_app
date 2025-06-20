@@ -27,10 +27,15 @@ router.post('/check-in',
   upload.single('faceImage'), 
   attendanceController.checkIn);
 
+  // Add this route to your attendance routes
+router.get('/checked-in/:attendanceId',
+  protect, 
+  restrictTo('instructor', 'admin'), 
+  attendanceController.getCheckedInStudents);
 
 
 
-router.get('/attendance/summary/:attendanceId/:studentId',
+router.get('/summary/:attendanceId/:studentId',
   protect, 
   restrictTo('instructor, admin'), 
   attendanceController.getAttendanceSummary);

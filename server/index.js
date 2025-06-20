@@ -8,12 +8,31 @@ const hallRoutes = require('./routes/hallRoute');
 const courseRoutes = require('./routes/courseRoutes')
 const userRoutes = require('./routes/useRoutes');
 const authRoutes = require('./routes/authRoutes');
-
+const cors = require('cors');
 
 const app = express();
+
+// Middleware
 app.use(express.json());
 
-app.use('/api/auth',authRoutes);
+// CORS Configuration
+app.use(cors({
+  origin: [
+    'http://localhost:5173', // Common Vite dev server port
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin'
+  ]
+}));
+
+// Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/instructors', instructorRoutes);
 app.use('/api/face', faceRoutes);
 app.use('/api/attendance', attendanceRoutes);
@@ -21,11 +40,12 @@ app.use('/api/halls', hallRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/user', userRoutes);
 
-
-
+// Database connection and model loading
 connectDB();
 loadModels();
 
-app.listen(3000, () => {
-    console.log('Server  is running on port 3000');
-})
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
