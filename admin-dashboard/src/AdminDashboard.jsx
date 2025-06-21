@@ -14,134 +14,16 @@ import StudentManagement from './components/StudentManagement';
 import DashboardHome from './components/DashboardHome';
 import InstructorManagement from './components/InstructorManagement';
 import SettingsPage from './components/Settings';
-import api from './api'; // Add your API import
+import api from './api';
+import CourseModal from './components/CourseModal';
 
-// Course Modal Component
-const CourseModal = ({ isOpen, onClose, onSubmit, course, lecturers }) => {
-  const [formData, setFormData] = useState({
-    title: '',
-    code: '',
-    instructor: '',
-    createdDate: new Date().toISOString().split('T')[0]
-  });
-
-  useEffect(() => {
-    if (course) {
-      setFormData({
-        title: course.title,
-        code: course.code,
-        instructor: course.instructor,
-        createdDate: course.createdDate.split('T')[0]
-      });
-    } else {
-      setFormData({
-        title: '',
-        code: '',
-        instructor: '',
-        createdDate: new Date().toISOString().split('T')[0]
-      });
-    }
-  }, [course]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit(formData);
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <h3 className="text-lg font-semibold mb-4">
-          {course ? 'Edit Course' : 'Add New Course'}
-        </h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Course Title
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.title}
-              onChange={(e) => setFormData({...formData, title: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="e.g., Introduction to Computer Science"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Course Code
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.code}
-              onChange={(e) => setFormData({...formData, code: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="e.g., CS101"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Instructor
-            </label>
-            <select
-              required
-              value={formData.instructor}
-              onChange={(e) => setFormData({...formData, instructor: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Select an instructor</option>
-              {lecturers.map((lecturer) => (
-                <option key={lecturer.id} value={lecturer.name}>
-                  {lecturer.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Created Date
-            </label>
-            <input
-              type="date"
-              required
-              value={formData.createdDate}
-              onChange={(e) => setFormData({...formData, createdDate: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              {course ? 'Update Course' : 'Add Course'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
 
 // Main Admin Dashboard Component
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [searchCourse, setSearchCourse] = useState('');
   const [notifications, setNotifications] = useState([
-    { id: 1, message: 'New instructor registration pending approval', type: 'warning', time: '2 hours ago' },
-    { id: 2, message: 'System maintenance scheduled for tonight', type: 'info', time: '1 day ago' },
-    { id: 3, message: 'High attendance rate in CS101 this week', type: 'success', time: '2 days ago' }
+  
   ]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [courseData, setCourseData] = useState([]);
@@ -171,42 +53,86 @@ const AdminDashboard = () => {
         setLecturers(lecturersResponse.data.data);
       }
 
-      // You can add more API calls here for other data
-      // const studentsResponse = await api.get('/users/students');
-      // const coursesResponse = await api.get('/courses');
-      // etc.
+      // Fetch students from API
+      const studentsResponse = await api.get('api/user/students');
+      if (studentsResponse.data.success) {
+        setStudents(studentsResponse.data.data);
+      }
+
+      // Fetch courses from API and extract lecturers
+      const coursesResponse = await api.get('api/courses');
+      if (coursesResponse.data.success) {
+        const coursesData = coursesResponse.data.data;
+        setCourses(coursesData);
+        
+        // Extract unique lecturers from the populated courses data
+        const uniqueLecturers = [];
+        const seenIds = new Set();
+        
+        coursesData.forEach(course => {
+          if (course.instructorId && typeof course.instructorId === 'object' && course.instructorId._id) {
+            // This is a populated instructor object
+            const instructor = course.instructorId;
+            if (!seenIds.has(instructor._id)) {
+              seenIds.add(instructor._id);
+              uniqueLecturers.push({
+                _id: instructor._id,
+                id: instructor._id, // Add both for compatibility
+                name: instructor.name,
+                email: instructor.email
+              });
+            }
+          }
+        });
+        
+        console.log('Extracted lecturers from courses:', uniqueLecturers);
+        
+        // If we have lecturers from courses, merge them with existing lecturers
+        if (uniqueLecturers.length > 0) {
+          setLecturers(prevLecturers => {
+            // Merge and deduplicate lecturers
+            const allLecturers = [...prevLecturers];
+            const existingIds = new Set(prevLecturers.map(l => l.id || l._id));
+            
+            uniqueLecturers.forEach(lecturer => {
+              if (!existingIds.has(lecturer.id)) {
+                allLecturers.push(lecturer);
+              }
+            });
+            
+            return allLecturers;
+          });
+        }
+      }
+
+      // Fetch pending instructors from API
+      const pendingResponse = await api.get('api/instructors/pending');
+      if (pendingResponse.data.success) {
+        setPendingInstructors(pendingResponse.data.data);
+      }
 
     } catch (error) {
       console.error('Failed to fetch data:', error);
       // Fallback to sample data if API fails
       setLecturers([
-        { id: 1, name: 'Dr. Emily Davis', email: 'emily@university.edu', status: 'active' },
-        { id: 2, name: 'Prof. Michael Brown', email: 'michael@university.edu', status: 'active' }
+        
+      ]);
+      
+      setStudents([
+        
+      ]);
+
+      setCourses([
+       
+      ]);
+
+      setPendingInstructors([
+        
       ]);
     } finally {
       setLoading(false);
     }
   };
-
-  // Sample data fallback
-  useEffect(() => {
-    // Initialize other data that might not have API endpoints yet
-    setPendingInstructors([
-      { id: 1, name: 'Dr. John Smith', email: 'john.smith@university.edu', status: 'pending' },
-      { id: 2, name: 'Prof. Sarah Johnson', email: 'sarah.johnson@university.edu', status: 'pending' }
-    ]);
-    
-    setStudents([
-      { id: 1, name: 'Alice Cooper', email: 'alice@student.edu', matriNumber: 'ST001' },
-      { id: 2, name: 'Bob Wilson', email: 'bob@student.edu', matriNumber: 'ST002' }
-    ]);
-
-    setCourses([
-      { id: 1, title: 'Introduction to Computer Science', code: 'CS101', instructor: 'Dr. Emily Davis', createdDate: '2024-01-15T00:00:00Z' },
-      { id: 2, title: 'Advanced Mathematics', code: 'MATH201', instructor: 'Prof. Michael Brown', createdDate: '2024-02-01T00:00:00Z' },
-      { id: 3, title: 'Physics Fundamentals', code: 'PHY101', instructor: 'Dr. Emily Davis', createdDate: '2024-01-20T00:00:00Z' }
-    ]);
-  }, []);
 
   // Sample attendance data generator
   const generateAttendanceData = (courseName) => {
@@ -226,37 +152,139 @@ const AdminDashboard = () => {
     }
   };
 
-  const approveInstructor = (id) => {
-    setPendingInstructors(prev => prev.filter(instructor => instructor.id !== id));
-    setNotifications(prev => [...prev, {
-      id: Date.now(),
-      message: `Instructor approved successfully`,
-      type: 'success',
-      time: 'Just now'
-    }]);
+ 
+
+  // Instructor Management Functions
+const approveInstructor = async (id) => {
+    try {
+      const response = await api.patch(`api/instructors/approve/${id}`);
+      if (response.data.success) {
+        setPendingInstructors(prev => prev.filter(instructor => (instructor.id || instructor._id) !== id));
+        setNotifications(prev => [...prev, {
+          id: Date.now(),
+          message: `Instructor approved successfully`,
+          type: 'success',
+          time: 'Just now'
+        }]);
+      }
+    } catch (error) {
+      console.error('Failed to approve instructor:', error);
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: `Failed to approve instructor`,
+        type: 'error',
+        time: 'Just now'
+      }]);
+    }
   };
 
-  const rejectInstructor = (id) => {
-    setPendingInstructors(prev => prev.filter(instructor => instructor.id !== id));
-    setNotifications(prev => [...prev, {
-      id: Date.now(),
-      message: `Instructor registration rejected`,
-      type: 'error',
-      time: 'Just now'
-    }]);
+  const rejectInstructor = async (id) => {
+    try {
+      const response = await api.delete(`api/instructors/reject/${id}`);
+      if (response.data.success) {
+        setPendingInstructors(prev => prev.filter(instructor => (instructor.id || instructor._id) !== id));
+        setNotifications(prev => [...prev, {
+          id: Date.now(),
+          message: `Instructor registration rejected`,
+          type: 'success',
+          time: 'Just now'
+        }]);
+      }
+    } catch (error) {
+      console.error('Failed to reject instructor:', error);
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: `Failed to reject instructor`,
+        type: 'error',
+        time: 'Just now'
+      }]);
+    }
   };
 
-  const deleteStudent = (id) => {
-    setStudents(prev => prev.filter(student => student.id !== id));
+  // Student Management Functions
+  const deleteStudent = async (id) => {
+    const confirm = window.confirm('Are you sure you want to delete this student?');
+    if (!confirm) return;
+
+    try {
+      await api.delete(`api/user/students/${id}`);
+      setStudents(prev => prev.filter(student => student.id !== id));
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: `Student deleted successfully`,
+        type: 'success',
+        time: 'Just now'
+      }]);
+    } catch (error) {
+      console.error('Failed to delete student:', error);
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: `Failed to delete student`,
+        type: 'error',
+        time: 'Just now'
+      }]);
+    }
   };
 
+  const editStudent = async (id, updatedData) => {
+    try {
+      const response = await api.put(`api/user/students/${id}`, updatedData);
+      if (response.data.success) {
+        setStudents(prev => prev.map(student => 
+          student.id === id ? response.data.data : student
+        ));
+        setNotifications(prev => [...prev, {
+          id: Date.now(),
+          message: `Student updated successfully`,
+          type: 'success',
+          time: 'Just now'
+        }]);
+        return response.data.data;
+      }
+    } catch (error) {
+      console.error('Failed to edit student:', error);
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: `Failed to update student`,
+        type: 'error',
+        time: 'Just now'
+      }]);
+      throw error;
+    }
+  };
+
+  const addStudent = async (studentData) => {
+    try {
+      const response = await api.post('api/user/students', studentData);
+      if (response.data.success) {
+        setStudents(prev => [...prev, response.data.data]);
+        setNotifications(prev => [...prev, {
+          id: Date.now(),
+          message: `Student added successfully`,
+          type: 'success',
+          time: 'Just now'
+        }]);
+        return true;
+      }
+    } catch (error) {
+      console.error('Failed to add student:', error);
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: `Failed to add student`,
+        type: 'error',
+        time: 'Just now'
+      }]);
+      return false;
+    }
+  };
+
+  // Lecturer Management Functions
   const deleteLecturer = async (id) => {
     const confirm = window.confirm('Are you sure you want to delete this lecturer?');
     if (!confirm) return;
 
     try {
-      await api.delete(`/users/instructors/${id}`);
-      // Update local state after successful deletion
+      await api.delete(`api/user/instructors/${id}`);
       setLecturers(prev => prev.filter(lecturer => lecturer.id !== id));
       setNotifications(prev => [...prev, {
         id: Date.now(),
@@ -275,27 +303,208 @@ const AdminDashboard = () => {
     }
   };
 
-  const deleteCourse = (id) => {
-    setCourses(prev => prev.filter(course => course.id !== id));
+  const editLecturer = async (id, updatedData) => {
+    try {
+      const response = await api.put(`api/user/instructors/${id}`, updatedData);
+      if (response.data.success) {
+        setLecturers(prev => prev.map(lecturer => 
+          lecturer.id === id ? response.data.data : lecturer
+        ));
+        setNotifications(prev => [...prev, {
+          id: Date.now(),
+          message: `Lecturer updated successfully`,
+          type: 'success',
+          time: 'Just now'
+        }]);
+        return response.data.data;
+      }
+    } catch (error) {
+      console.error('Failed to edit lecturer:', error);
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: `Failed to update lecturer`,
+        type: 'error',
+        time: 'Just now'
+      }]);
+      throw error;
+    }
   };
 
-  const handleCourseSubmit = (formData) => {
+  const addLecturer = async (lecturerData) => {
+    try {
+      const response = await api.post('api/user/instructors', lecturerData);
+      if (response.data.success) {
+        setLecturers(prev => [...prev, response.data.data]);
+        setNotifications(prev => [...prev, {
+          id: Date.now(),
+          message: `Lecturer added successfully`,
+          type: 'success',
+          time: 'Just now'
+        }]);
+        return true;
+      }
+    } catch (error) {
+      console.error('Failed to add lecturer:', error);
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: `Failed to add lecturer`,
+        type: 'error',
+        time: 'Just now'
+      }]);
+      return false;
+    }
+  };
+
+  // Course Management Functions
+  const deleteCourse = async (id) => {
+    const confirm = window.confirm('Are you sure you want to delete this course?');
+    if (!confirm) return;
+
+    try {
+      await api.delete(`api/courses/${id}`);
+      setCourses(prev => prev.filter(course => course.id !== id));
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: `Course deleted successfully`,
+        type: 'success',
+        time: 'Just now'
+      }]);
+    } catch (error) {
+      console.error('Failed to delete course:', error);
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: `Failed to delete course`,
+        type: 'error',
+        time: 'Just now'
+      }]);
+    }
+  };
+
+ // Updated addCourse function
+const addCourse = async (courseData) => {
+  try {
+    console.log('Sending course data:', courseData);
+    
+    // Ensure we're sending instructorId, not instructor name
+    const dataToSend = {
+      title: courseData.title,
+      code: courseData.code,
+      instructorId: courseData.instructorId, // This should be the ObjectId
+      createdDate: courseData.createdDate
+    };
+    
+    // Validation on frontend
+    if (!dataToSend.instructorId) {
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: 'Please select an instructor',
+        type: 'error',
+        time: 'Just now'
+      }]);
+      return false;
+    }
+    
+    console.log('Data being sent to API:', dataToSend);
+    
+    const response = await api.post('/api/courses', dataToSend);
+    
+    console.log('API Response:', response.data);
+    
+    if (response.data.success) {
+      const newCourse = {
+        ...response.data.data,
+        id: response.data.data._id
+      };
+      
+      setCourses(prev => [...prev, newCourse]);
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: `Course "${courseData.title}" added successfully`,
+        type: 'success',
+        time: 'Just now'
+      }]);
+      return true;
+    } else {
+      console.error('API returned success: false', response.data);
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: response.data.message || 'Failed to add course',
+        type: 'error',
+        time: 'Just now'
+      }]);
+      return false;
+    }
+  } catch (error) {
+    console.error('Failed to add course - Full error:', error);
+    console.error('Error response:', error.response?.data);
+    
+    let errorMessage = 'Failed to add course';
+    if (error.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    } else if (error.response?.data?.error) {
+      errorMessage = error.response.data.error;
+    }
+    
+    setNotifications(prev => [...prev, {
+      id: Date.now(),
+      message: errorMessage,
+      type: 'error',
+      time: 'Just now'
+    }]);
+    return false;
+  }
+};
+
+// Function to fetch instructors for dropdown
+const fetchInstructors = async () => {
+  try {
+    const response = await api.get('/api/instructors'); // or '/api/users'
+    if (response.data.success) {
+      return response.data.data;
+    }
+    return [];
+  } catch (error) {
+    console.error('Failed to fetch instructors:', error);
+    return [];
+  }
+};
+
+  const editCourse = async (id, courseData) => {
+    try {
+      const response = await api.put(`api/courses/${id}`, {
+        ...courseData,
+        createdDate: courseData.createdDate + 'T00:00:00Z'
+      });
+      if (response.data.success) {
+        setCourses(prev => prev.map(course => 
+          course.id === id ? response.data.data : course
+        ));
+        setNotifications(prev => [...prev, {
+          id: Date.now(),
+          message: `Course updated successfully`,
+          type: 'success',
+          time: 'Just now'
+        }]);
+        return response.data.data;
+      }
+    } catch (error) {
+      console.error('Failed to edit course:', error);
+      setNotifications(prev => [...prev, {
+        id: Date.now(),
+        message: `Failed to update course`,
+        type: 'error',
+        time: 'Just now'
+      }]);
+      throw error;
+    }
+  };
+
+  const handleCourseSubmit = async (formData) => {
     if (editingCourse) {
-      // Update existing course
-      setCourses(prev => prev.map(course => 
-        course.id === editingCourse.id 
-          ? { ...course, ...formData, createdDate: formData.createdDate + 'T00:00:00Z' }
-          : course
-      ));
+      await editCourse(editingCourse.id, formData);
       setEditingCourse(null);
     } else {
-      // Add new course
-      const newCourse = {
-        id: Date.now(),
-        ...formData,
-        createdDate: formData.createdDate + 'T00:00:00Z'
-      };
-      setCourses(prev => [...prev, newCourse]);
+      await addCourse(formData);
     }
     setShowAddCourseModal(false);
   };
@@ -335,7 +544,10 @@ const AdminDashboard = () => {
           <StudentManagement
             students={students}
             deleteStudent={deleteStudent}
+            editStudent={editStudent}
+            addStudent={addStudent}
             setShowAddStudentModal={setShowAddStudentModal}
+            loading={loading}
           />
         );
       case 'lecturers':
@@ -343,6 +555,8 @@ const AdminDashboard = () => {
           <LecturerManagement
             lecturers={lecturers}
             deleteLecturer={deleteLecturer}
+            editLecturer={editLecturer}
+            addLecturer={addLecturer}
             setShowAddLecturerModal={setShowAddLecturerModal}
             loading={loading}
           />
@@ -351,7 +565,11 @@ const AdminDashboard = () => {
         return (
           <CourseManagement
             courses={courses}
+            lecturers={lecturers}
+            loading={loading}
             deleteCourse={deleteCourse}
+            editCourse={editCourse}
+            addCourse={addCourse}
             setShowAddCourseModal={setShowAddCourseModal}
             setEditingCourse={setEditingCourse}
           />
