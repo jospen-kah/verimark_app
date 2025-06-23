@@ -36,7 +36,7 @@ const ActiveAttendanceScreen = () => {
 
   // Define session data type
   interface SessionData {
-    status: 'active' | 'open' | 'closed' | 'ended';
+    status: 'open' | 'closed';
     checkedInCount?: number;
     sessionId?: string;
     startTime?: string;
@@ -139,7 +139,7 @@ const ActiveAttendanceScreen = () => {
   // Update local session state based on API response
   useEffect(() => {
     if (sessionData?.status) {
-      const isActive = sessionData.status === 'active' || sessionData.status === 'open';
+      const isActive = sessionData.status === 'open';
       setSessionActive(isActive);
       
       // If session is closed from backend, stop the countdown
@@ -149,43 +149,6 @@ const ActiveAttendanceScreen = () => {
       }
     }
   }, [sessionData]);
-
-  // Timer logic for session countdown
-  useEffect(() => {
-    if (!sessionActive || countdown <= 0) return;
-
-    const interval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setSessionActive(false);
-          setRemainingTime('00 : 00 : 00');
-          Alert.alert('Session Ended', 'The attendance session has ended automatically.', [
-            {
-              text: 'OK',
-              onPress: () => router.back(),
-            },
-          ]);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [sessionActive, countdown]);
-
-  // Format countdown seconds to HH : MM : SS
-  useEffect(() => {
-    const hours = Math.floor(countdown / 3600);
-    const minutes = Math.floor((countdown % 3600) / 60);
-    const seconds = countdown % 60;
-    setRemainingTime(
-      `${hours.toString().padStart(2, '0')} : ${minutes
-        .toString()
-        .padStart(2, '0')} : ${seconds.toString().padStart(2, '0')}`
-    );
-  }, [countdown]);
 
   // Mutation to end the session
   const endSessionMutation = useMutation({
@@ -204,6 +167,7 @@ const ActiveAttendanceScreen = () => {
     },
     onSuccess: () => {
       setSessionActive(false);
+      setCountdown(0);
       setRemainingTime('00 : 00 : 00');
       // Force refetch session status to update UI immediately
       refetchSession();
@@ -214,27 +178,85 @@ const ActiveAttendanceScreen = () => {
         refetchSession();
         refetchStudents();
       }, 100);
-      
-      Alert.alert('Session Ended', 'The attendance session has ended successfully.', [
-        {
-          text: 'OK',
-        },
-      ]);
     },
     onError: (error: any) => {
-      Alert.alert(
-        'Failed to End Session',
-        error?.response?.data?.message || 'An error occurred. Please try again.'
-      );
-      // Refetch to ensure we have the latest status even on error
+      console.error('Failed to end session:', error);
+      // Still update local state even if API call fails to prevent UI inconsistency
+      setSessionActive(false);
+      setCountdown(0);
+      setRemainingTime('00 : 00 : 00');
+      
+      // Refetch to ensure we have the latest status
       refetchSession();
       refetchStudents();
     },
   });
 
-  const handleEndSession = () => {
+  // Function to automatically end session
+  const autoEndSession = React.useCallback(async () => {
+    if (!sessionId || !token) return;
+    
+    try {
+      console.log('Auto-ending session:', sessionId);
+      
+      const response = await axios.post(
+        'http://192.168.1.172:3000/api/attendance/end-session',
+        { attendanceId: sessionId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      
+      console.log('Auto-end session response:', response.data);
+      
+      // Update local state
+      setSessionActive(false);
+      setCountdown(0);
+      setRemainingTime('00 : 00 : 00');
+      
+      // Force refetch to update UI
+      await refetchSession();
+      await refetchStudents();
+      
+      // Show alert after successful API call
+      Alert.alert(
+        'Session Ended', 
+        'The attendance session has ended automatically.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.back(),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Auto end session failed:', error);
+      
+      // Update local state even if API fails
+      setSessionActive(false);
+      setCountdown(0);
+      setRemainingTime('00 : 00 : 00');
+      
+      // Show alert even if API call fails
+      Alert.alert(
+        'Session Time Expired', 
+        'The attendance session time has expired. Please check your connection and try again if needed.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.back(),
+          },
+        ]
+      );
+    }
+  }, [sessionId, token, refetchSession, refetchStudents]);
+
+  // Manual end session handler
+  const handleEndSession = React.useCallback(async () => {
     // First verify if session is still active
-    if (!sessionActive || sessionData?.status === 'closed' || sessionData?.status === 'ended') {
+    if (!sessionActive || sessionData?.status === 'closed') {
       Alert.alert('Session Already Ended', 'This attendance session has already been closed.');
       return;
     }
@@ -247,13 +269,81 @@ const ActiveAttendanceScreen = () => {
         {
           text: 'End Session',
           style: 'destructive',
-          onPress: () => {
-            endSessionMutation.mutate();
+          onPress: async () => {
+            try {
+              console.log('Manual end session for:', sessionId);
+              
+              const response = await axios.post(
+                'http://192.168.1.172:3000/api/attendance/end-session',
+                { attendanceId: sessionId },
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                }
+              );
+              
+              console.log('Manual end session response:', response.data);
+              
+              // Update local state
+              setSessionActive(false);
+              setCountdown(0);
+              setRemainingTime('00 : 00 : 00');
+              
+              // Force refetch to update UI
+              await refetchSession();
+              await refetchStudents();
+              
+              Alert.alert('Session Ended', 'The attendance session has ended successfully.', [
+                {
+                  text: 'OK',
+                },
+              ]);
+            } catch (error: any) {
+              console.error('Manual end session failed:', error);
+              Alert.alert(
+                'Failed to End Session',
+                error?.response?.data?.message || 'An error occurred. Please try again.'
+              );
+            }
           },
         },
       ]
     );
-  };
+  }, [sessionActive, sessionData, sessionId, token, refetchSession, refetchStudents]);
+
+  // Timer logic for session countdown
+  useEffect(() => {
+    if (!sessionActive || countdown <= 0) return;
+
+    const interval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          // Automatically end the session when timer expires
+          if (sessionId && token) {
+            autoEndSession();
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [sessionActive, countdown, sessionId, token]);
+
+  // Format countdown seconds to HH : MM : SS
+  useEffect(() => {
+    const hours = Math.floor(countdown / 3600);
+    const minutes = Math.floor((countdown % 3600) / 60);
+    const seconds = countdown % 60;
+    setRemainingTime(
+      `${hours.toString().padStart(2, '0')} : ${minutes
+        .toString()
+        .padStart(2, '0')} : ${seconds.toString().padStart(2, '0')}`
+    );
+  }, [countdown]);
 
   useEffect(() => {
     SecureStore.getItemAsync('token').then(setToken);
@@ -284,9 +374,9 @@ const ActiveAttendanceScreen = () => {
   );
 
   // Determine button state based on session status
-  const isSessionClosed = sessionData?.status === 'closed' || sessionData?.status === 'ended' || !sessionActive;
+  const isSessionClosed = sessionData?.status === 'closed' || !sessionActive;
   const buttonText = isSessionClosed ? 'Session Ended' : 'End Session';
-  const buttonDisabled = isSessionClosed || endSessionMutation.isPending || isLoadingSession;
+  const buttonDisabled = isSessionClosed || isLoadingSession;
 
   const renderStudentItem = ({ item }: { item: Student }) => (
     <View style={[styles.studentItem, { backgroundColor: theme.card }]}>
@@ -358,13 +448,22 @@ const ActiveAttendanceScreen = () => {
         <TouchableOpacity
           style={[
             styles.endSessionButton,
-            buttonDisabled && { backgroundColor: '#8E8E93' },
+            {
+              backgroundColor: isSessionClosed 
+                ? '#8E8E93'  // Ash/gray when ended
+                : '#FF3B30'  // Red when active
+            }
           ]}
           onPress={handleEndSession}
           disabled={buttonDisabled}
         >
-          <Text style={styles.endSessionButtonText}>
-            {endSessionMutation.isPending ? 'Ending...' : buttonText}
+          <Text style={[
+            styles.endSessionButtonText,
+            {
+              color: isSessionClosed ? '#FFFFFF99' : '#FFFFFF'  // Lighter text when disabled
+            }
+          ]}>
+            {buttonText}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity

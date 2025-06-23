@@ -164,12 +164,12 @@ export default function LoginScreen() {
           </View>
         </View>
 
-        <TouchableOpacity onPress={() => router.push('/screens/student')}>
+        {/* <TouchableOpacity onPress={() => router.push('/screens/student')}>
           <Text>Student</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/screens')}>
           <Text>Instructor</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
       </ScrollView>
     </SafeAreaView>

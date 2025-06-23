@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   TextInput,
+  Alert,
 } from 'react-native';
 import Header from '../../../../components/Header';
 import ClassCard from '../../../../components/ClassCard';
@@ -35,6 +36,14 @@ const fetchOpenAttendances = async () => {
   return res.data;
 };
 
+const checkFaceRegistrationStatus = async () => {
+  const token = await SecureStore.getItemAsync('token');
+  const res = await axios.get('http://192.168.1.172:3000/api/face/check-status', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
 const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ title }) => {
   const { theme } = useTheme();
   const queryClient = useQueryClient();
@@ -54,6 +63,7 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ title }) => {
       if (studentId) {
         queryClient.invalidateQueries({ queryKey: ['studentProfile', studentId] });
         queryClient.invalidateQueries({ queryKey: ['openAttendances'] });
+        queryClient.invalidateQueries({ queryKey: ['faceRegistrationStatus'] });
       }
     }, [queryClient, studentId])
   );
@@ -78,7 +88,31 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ title }) => {
     enabled: !!studentId,
   });
 
-  if (!studentId || isLoading || sessionsLoading) {
+  const {
+    data: faceRegistrationStatus,
+    isLoading: faceStatusLoading,
+  } = useQuery({
+    queryKey: ['faceRegistrationStatus'],
+    queryFn: checkFaceRegistrationStatus,
+    enabled: !!studentId,
+  });
+
+  const handleFaceRegistrationPress = () => {
+    if (faceRegistrationStatus?.isRegistered) {
+      Alert.alert(
+        'Face Already Registered',
+        faceRegistrationStatus.needsApproval 
+          ? 'Your face is already registered. To update it, you need admin approval. Please contact your administrator.'
+          : 'Your face is already registered and verified.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    router.push('/screens/student/otherScreens/StudentFaceRegistrationScreen');
+  };
+
+  if (!studentId || isLoading || sessionsLoading || faceStatusLoading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator color={theme.text} size="large" />
@@ -124,10 +158,23 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ title }) => {
 
           <View style={styles.grid}>
             <TouchableOpacity
-              style={styles.box}
-              onPress={() => router.push('/screens/student/otherScreens/StudentFaceRegistrationScreen')}
+              style={[
+                styles.box,
+                faceRegistrationStatus?.isRegistered && styles.disabledBox
+              ]}
+              onPress={handleFaceRegistrationPress}
             >
-              <Text style={styles.boxText}>Face Registration</Text>
+              <Text style={[
+                styles.boxText,
+                faceRegistrationStatus?.isRegistered && styles.disabledBoxText
+              ]}>
+                {faceRegistrationStatus?.isRegistered ? 'Face Registered ✓' : 'Face Registration'}
+              </Text>
+              {faceRegistrationStatus?.isRegistered && (
+                <Text style={styles.registeredSubText}>
+                  {faceRegistrationStatus.needsApproval ? 'Admin approval needed for updates' : 'Verified'}
+                </Text>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push('/screens/student/(tabs)/studentAttendanceScreen')}
@@ -165,9 +212,6 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ title }) => {
                     hour: '2-digit',
                     minute: '2-digit',
                   })}`}
-
-
-                  hall={session.hallName}
                   status="Active"
                 />
               </TouchableOpacity>
@@ -224,9 +268,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     elevation: 2,
   },
+  disabledBox: {
+    backgroundColor: '#f0f0f0',
+    opacity: 0.7,
+  },
   boxText: {
     color: '#4f9dfc',
     fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  disabledBoxText: {
+    color: '#666',
+  },
+  registeredSubText: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 5,
     textAlign: 'center',
   },
   sectionTitle: {

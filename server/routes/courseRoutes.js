@@ -4,21 +4,45 @@ const {
   createCourse,
   updateCourse,
   getCourse,
-  getAllCourses
+  getAllCourses,
+  deleteCourse,
+  getCoursesByInstructor
 } = require('../controllers/course.controller');
 
 const { protect, restrictTo } = require('../middlewares/authMiddleware');
 
-// Create a course (admin or instructor)
-router.post('/create', protect, restrictTo('admin'), createCourse);
-
-// Edit a course
-router.put('/:id/edit', protect, restrictTo('admin'), updateCourse);
-
-// Get course details
-router.get('/:id', protect, getCourse);
-
 // Get all courses
-router.get('/',  getAllCourses);
+router.get('/', 
+  // protect,
+  // restrictTo('admin'), 
+  getAllCourses);
+
+// Create a new course
+router.post('/',
+  // protect,
+  // restrictTo('admin'),
+  createCourse);
+
+// Get single course
+router.get('/:id',
+  // protect,
+  getCourse);
+
+// Update course
+router.put('/:id',
+  // protect,
+  // restrictTo('admin'),
+  updateCourse);
+
+// Delete course
+router.delete('/:id',
+  // protect,
+  // restrictTo('admin'),
+  deleteCourse);
+
+router.get('/instructor/:instructorId',
+  // protect,
+  // restrictTo('admin', 'instructor'),
+  getCoursesByInstructor);
 
 module.exports = router;

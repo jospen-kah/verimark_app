@@ -1,6 +1,6 @@
- // screens/instructor/InstructorHomeScreen.tsx
+// screens/instructor/InstructorHomeScreen.tsx
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import Header from '../../../../components/Header';
 import ClassCard from '../../../../components/ClassCard';
 import { router } from 'expo-router';
@@ -32,6 +32,7 @@ const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) =>
   const { theme } = useTheme();
   const queryClient = useQueryClient();
   const [instructorId, setInstructorId] = useState<string | null>(null);
+  const [hiddenSessions, setHiddenSessions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const getUserId = async () => {
@@ -42,14 +43,13 @@ const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) =>
   }, []);
 
   useFocusEffect(
-  useCallback(() => {
-    if (instructorId) {
-      queryClient.invalidateQueries({ queryKey: ['instructorProfile', instructorId] });
-      queryClient.invalidateQueries({ queryKey: ['instructorSessions'] });
-    }
-  }, [queryClient, instructorId])
-);
-
+    useCallback(() => {
+      if (instructorId) {
+        queryClient.invalidateQueries({ queryKey: ['instructorProfile', instructorId] });
+        queryClient.invalidateQueries({ queryKey: ['instructorSessions'] });
+      }
+    }, [queryClient, instructorId])
+  );
 
   const { data: instructorData, isLoading, error } = useQuery({
     queryKey: ['instructorProfile', instructorId],
@@ -61,6 +61,26 @@ const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) =>
     queryKey: ['instructorSessions'],
     queryFn: fetchSessions,
   });
+
+  const handleCloseSession = (sessionId: string) => {
+    Alert.alert(
+      "Close Session",
+      "Are you sure you want to remove this session from view?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Close",
+          style: "destructive",
+          onPress: () => {
+            setHiddenSessions(prev => new Set([...prev, sessionId]));
+          }
+        }
+      ]
+    );
+  };
 
   if (!instructorId || isLoading || sessionsLoading) {
     return (
@@ -83,6 +103,13 @@ const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) =>
   const userTitle = instructorData?.title || '';
   const isApproved = instructorData?.isApproved;
   const name = `${userTitle} ${firstName} ${lastName}`;
+
+  // Sort sessions by start time (most recent first) and filter out hidden sessions
+  const sortedSessions = Array.isArray(sessions) 
+    ? sessions
+        .filter(session => !hiddenSessions.has(session.attendanceId))
+        .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+    : [];
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -127,29 +154,41 @@ const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) =>
           </View>
 
           <Text style={[styles.sectionTitle, { color: theme.text }]}>My Sessions</Text>
-          {Array.isArray(sessions) && sessions.length > 0 ? (
-            sessions.map((session: any) => (
-              <TouchableOpacity
-                key={session.attendanceId}
-                onPress={() =>
-                  router.push({
-                    pathname: '/screens/(instructor)/otherScreens/ActiveAttendanceScreen',
-                    params: {
-                      sessionId: session.attendanceId,
-                      selectedCourse: JSON.stringify({ code: session.courseCode, title: session.title }),
-                      selectedHall: JSON.stringify({ name: session.hallName }),
-                      startTime: session.startTime,
-                    },
-                  })
-                }
-              >
-                <ClassCard
-                  title={`${session.courseCode} - ${session.courseName}`}
-                  time={new Date(session.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  hall={session.hallName}
-                  status={session.status === 'open' ? 'Ongoing' : 'Over'}
-                />
-              </TouchableOpacity>
+          {sortedSessions.length > 0 ? (
+            sortedSessions.map((session: any) => (
+              <View key={session.attendanceId} style={styles.sessionContainer}>
+                <TouchableOpacity
+                  style={styles.sessionCard}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/screens/(instructor)/otherScreens/ActiveAttendanceScreen',
+                      params: {
+                        sessionId: session.attendanceId,
+                        selectedCourse: JSON.stringify({ code: session.courseCode, title: session.title }),
+                        selectedHall: JSON.stringify({ name: session.hallName }),
+                        startTime: session.startTime,
+                      },
+                    })
+                  }
+                >
+                  <ClassCard
+                    title={`${session.courseCode} - ${session.courseName}`}
+                    time={new Date(session.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    hall={session.hallName}
+                    status={session.status === 'open' ? 'Ongoing' : 'Over'}
+                  />
+                </TouchableOpacity>
+                
+                {/* Close button - only show when session is over */}
+                {session.status !== 'open' && (
+                  <TouchableOpacity
+                    style={[styles.closeButton, { backgroundColor: theme.card }]}
+                    onPress={() => handleCloseSession(session.attendanceId)}
+                  >
+                    <Text style={[styles.closeButtonText, { color: theme.text }]}>×</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             ))
           ) : (
             <Text style={{ color: theme.text, textAlign: 'center', marginTop: 10 }}>
@@ -209,6 +248,33 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     paddingHorizontal: 20,
     marginBottom: 10,
+  },
+  sessionContainer: {
+    position: 'relative',
+    marginBottom: 5,
+  },
+  sessionCard: {
+    flex: 1,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    elevation: 2,
+    zIndex: 1,
+  },
+  closeButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    lineHeight: 20,
   },
 });
 

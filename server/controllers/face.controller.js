@@ -28,6 +28,20 @@ exports.registerFace = async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'No image uploaded' });
 
   try {
+    // Check if student already has face registered
+    const existingFaceData = await FaceData.findOne({ studentId: req.user._id });
+    
+    if (existingFaceData && existingFaceData.registerStatus === true) {
+      // If face is already registered, check if admin has approved update
+      if (!existingFaceData.isApprovedForUpdate) {
+        return res.status(403).json({ 
+          message: 'Face already registered. Admin approval required for updates.',
+          isRegistered: true,
+          needsApproval: true
+        });
+      }
+    }
+
     // Debug file save (optional)
     fs.writeFileSync('debug_upload_register.jpg', req.file.buffer);
 
@@ -53,6 +67,9 @@ exports.registerFace = async (req, res) => {
       return res.status(400).json({ message: 'Invalid face data generated' });
     }
 
+    const isFirstRegistration = !existingFaceData || existingFaceData.registerStatus === false;
+    const now = new Date();
+
     // Store the complete face result object (with metadata) in the database
     const faceDataDoc = await FaceData.findOneAndUpdate(
       { studentId: req.user._id },
@@ -63,25 +80,90 @@ exports.registerFace = async (req, res) => {
           hash: faceResult.hash,
           timestamp: faceResult.timestamp,
           debugId: faceResult.debugId
-        }
+        },
+        registerStatus: true, // Set to true after successful registration
+        registrationDate: isFirstRegistration ? now : existingFaceData?.registrationDate,
+        lastUpdateDate: now,
+        isApprovedForUpdate: false // Reset approval status after update
       },
       { upsert: true, new: true }
     );
 
     console.log('✅ Face data saved to database');
     console.log('Document ID:', faceDataDoc._id);
+    console.log('Registration status set to:', faceDataDoc.registerStatus);
     console.log('=== FACE REGISTRATION END ===');
 
     return res.status(200).json({ 
-      message: 'Face registered successfully',
+      message: isFirstRegistration ? 'Face registered successfully' : 'Face updated successfully',
       confidence: faceResult.confidence,
-      hash: faceResult.hash
+      hash: faceResult.hash,
+      isFirstRegistration,
+      registerStatus: true
     });
   } catch (err) {
     console.error('❌ Face registration error:', err);
     console.error('Error stack:', err.stack);
     return res.status(500).json({ 
       message: 'Failed to process face image',
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+    });
+  }
+};
+
+// New endpoint to check face registration status
+exports.checkFaceRegistrationStatus = async (req, res) => {
+  try {
+    const faceData = await FaceData.findOne({ studentId: req.user._id });
+    
+    if (!faceData) {
+      return res.status(200).json({ 
+        isRegistered: false,
+        canRegister: true,
+        message: 'No face data found. You can register your face.'
+      });
+    }
+
+    return res.status(200).json({
+      isRegistered: faceData.registerStatus,
+      canRegister: !faceData.registerStatus,
+      needsApproval: faceData.registerStatus && !faceData.isApprovedForUpdate,
+      registrationDate: faceData.registrationDate,
+      lastUpdateDate: faceData.lastUpdateDate
+    });
+  } catch (err) {
+    console.error('Error checking face registration status:', err);
+    return res.status(500).json({ 
+      message: 'Failed to check registration status',
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+    });
+  }
+};
+
+// Admin endpoint to approve face updates
+exports.approveFaceUpdate = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    
+    const faceData = await FaceData.findOneAndUpdate(
+      { studentId },
+      { isApprovedForUpdate: true },
+      { new: true }
+    );
+
+    if (!faceData) {
+      return res.status(404).json({ message: 'Face data not found for this student' });
+    }
+
+    return res.status(200).json({
+      message: 'Face update approved successfully',
+      studentId,
+      isApprovedForUpdate: faceData.isApprovedForUpdate
+    });
+  } catch (err) {
+    console.error('Error approving face update:', err);
+    return res.status(500).json({ 
+      message: 'Failed to approve face update',
       error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
     });
   }

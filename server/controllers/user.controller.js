@@ -92,21 +92,31 @@ exports.getAllInstructors = async (req, res) => {
 };
 
 exports.editInstructor = async (req, res) => {
+  console.log('=== EDIT INSTRUCTOR DEBUG ===');
+  console.log('Request params:', req.params);
+  console.log('Request body:', req.body);
+  console.log('Request method:', req.method);
+  
   try {
     const { id } = req.params;
     const updates = req.body;
 
+    console.log('Searching for instructor with ID:', id);
+    
     const instructor = await User.findOneAndUpdate(
       { _id: id, role: 'instructor' },
       updates,
       { new: true }
     );
 
+    console.log('Found instructor:', instructor);
+
     if (!instructor) {
+      console.log('No instructor found with that ID and role');
       return res.status(404).json({ success: false, message: 'Instructor not found' });
     }
 
-    // Return formatted data consistent with getAllInstructors
+    // Return formatted data
     const formatted = {
       id: instructor._id.toString(),
       name: `${instructor.title} ${instructor.firstName} ${instructor.lastName}`,
@@ -118,13 +128,13 @@ exports.editInstructor = async (req, res) => {
       isApproved: instructor.isApproved
     };
 
+    console.log('Returning formatted data:', formatted);
     res.status(200).json({ success: true, data: formatted });
   } catch (error) {
     console.error('Error editing instructor:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
-
 exports.deleteInstructor = async (req, res) => {
   try {
     const { id } = req.params;
@@ -142,7 +152,70 @@ exports.deleteInstructor = async (req, res) => {
   }
 };
 
+// Add new instructor
+exports.addInstructor = async (req, res) => {
+  try {
+    const { title, firstName, lastName, email, isApproved } = req.body;
 
+    // Check if instructor with this email already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User with this email already exists' 
+      });
+    }
+
+    // Create new instructor
+    const newInstructor = new User({
+      title,
+      firstName,
+      lastName,
+      email,
+      role: 'instructor',
+      isApproved: isApproved || false,
+      // You might want to set a default password or require password in the request
+      password: 'defaultPassword123', // Consider requiring this in the request body
+    });
+
+    const savedInstructor = await newInstructor.save();
+
+    // Return formatted data
+    const formatted = {
+      id: savedInstructor._id.toString(),
+      name: `${savedInstructor.title} ${savedInstructor.firstName} ${savedInstructor.lastName}`,
+      email: savedInstructor.email,
+      status: savedInstructor.isApproved ? 'active' : 'inactive',
+      title: savedInstructor.title,
+      firstName: savedInstructor.firstName,
+      lastName: savedInstructor.lastName,
+      isApproved: savedInstructor.isApproved
+    };
+
+    res.status(201).json({ 
+      success: true, 
+      data: formatted,
+      message: 'Instructor added successfully'
+    });
+  } catch (error) {
+    console.error('Error adding instructor:', error);
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Validation error',
+        errors: validationErrors
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error while adding instructor' 
+    });
+  }
+};
 // Get All Students
 exports.getAllStudents = async (req, res) => {
   try {

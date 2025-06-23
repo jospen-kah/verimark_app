@@ -5,11 +5,10 @@ import { useTheme } from '../ThemeContext'; // adjust path if needed
 interface ClassCardProps {
   title: string;
   time: string;
-  hall: string | number;
   status: string;
 }
 
-const ClassCard: React.FC<ClassCardProps> = ({ title, time, hall, status }) => {
+const ClassCard: React.FC<ClassCardProps> = ({ title, time, status }) => {
   const { theme } = useTheme();
 
   return (
@@ -19,7 +18,6 @@ const ClassCard: React.FC<ClassCardProps> = ({ title, time, hall, status }) => {
         <View style={{ flex: 1 }}>
           <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
           <Text style={[styles.sub, { color: theme.text }]}>{time}</Text>
-          <Text style={[styles.sub, { color: theme.text }]}>Hall {hall}</Text>
         </View>
         <Text
           style={[

@@ -36,7 +36,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/instructors', instructorRoutes);
 app.use('/api/face', faceRoutes);
 app.use('/api/attendance', attendanceRoutes);
-app.use('/api/halls', hallRoutes);
+app.use('/api/halls', hallRoutes); 
 app.use('/api/courses', courseRoutes);
 app.use('/api/user', userRoutes);
 

@@ -21,13 +21,7 @@ const FaceRegistrationSuccessScreen = () => {
       {/* Title */}
       <Text style={styles.title}>Face Registration</Text>
 
-      {/* User Image */}
-      {/* <View style={styles.imageContainer}>
-        <Image
-          source={require('../../../../assets/images/profile.jpg')}
-          style={styles.image}
-        />
-      </View> */}
+    
 
       {/* Success Icon and Text */}
       <View style={styles.successContainer}>

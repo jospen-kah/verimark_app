@@ -20,6 +20,13 @@ router.put(
   userController.updateFaceProfile
 );
 
+router.post(
+  '/instructor',
+  // protect,
+// restrictTo('admin'), 
+  userController.addInstructor
+);
+
 router.get('/instructors', 
   // protect,
   // restrictTo('admin'), 
@@ -30,7 +37,7 @@ router.get('/students',
   // restrictTo('admin'),
   userController.getAllStudents);
 
-  // Instructor edit & delete
+  // Instructor edit 
 router.put('/instructors/:id', 
   // protect,
   // restrictTo('admin'),
