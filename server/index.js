@@ -8,6 +8,7 @@ const hallRoutes = require('./routes/hallRoute');
 const courseRoutes = require('./routes/courseRoutes')
 const userRoutes = require('./routes/useRoutes');
 const authRoutes = require('./routes/authRoutes');
+const attendanceLogRoutes = require('./routes/attendanceLogRoutes');
 const cors = require('cors');
 
 const app = express();
@@ -39,6 +40,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/halls', hallRoutes); 
 app.use('/api/courses', courseRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/attendance-log', attendanceLogRoutes);
 
 // Database connection and model loading
 connectDB();

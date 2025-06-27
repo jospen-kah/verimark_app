@@ -93,9 +93,7 @@ const register = async (req, res) => {
   }
 };
 
-module.exports = {
-  register,
-};
+
 
 //verify email
 const verifyEmail = async (req, res) => {

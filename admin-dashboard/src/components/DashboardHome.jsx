@@ -1,25 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Bell, 
-  Home, 
   Users, 
   UserCheck, 
-  GraduationCap, 
-  Settings, 
+  GraduationCap,  
   Search,
-  Plus,
-  Trash2,
-  Check,
-  X,
   Calendar,
   TrendingUp,
-  Filter,
-  BookOpen,
-  Edit
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
-const DashboardHome = ({ pendingInstructors, courseData, searchCourse, setSearchCourse, handleCourseSearch, totalCourses }) => {
+const DashboardHome = ({ 
+  pendingInstructors, 
+  courseData, 
+  searchCourse, 
+  setSearchCourse, 
+  handleCourseSearch, 
+  totalCourses,
+  totalStudents,      // Add this prop
+  activeInstructors   // Add this prop
+}) => {
+  // Debug logging
+  console.log('DashboardHome props:', {
+    pendingInstructors: pendingInstructors?.length,
+    totalCourses,
+    totalStudents,
+    activeInstructors
+  });
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-lg shadow-sm border p-6">
@@ -63,7 +69,7 @@ const DashboardHome = ({ pendingInstructors, courseData, searchCourse, setSearch
               </div>
               <div className="bg-purple-50 p-4 rounded-lg">
                 <h3 className="text-sm font-medium text-purple-600 mb-2">Total Students</h3>
-                <p className="text-2xl font-bold text-purple-700">100</p>
+                <p className="text-2xl font-bold text-purple-700">{totalStudents || 0}</p>
               </div>
             </div>
 
@@ -103,7 +109,7 @@ const DashboardHome = ({ pendingInstructors, courseData, searchCourse, setSearch
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Total Students</p>
-              <p className="text-2xl font-bold text-gray-900">1,234</p>
+              <p className="text-2xl font-bold text-gray-900">{totalStudents || 0}</p>
             </div>
             <Users className="w-8 h-8 text-blue-600" />
           </div>
@@ -112,7 +118,7 @@ const DashboardHome = ({ pendingInstructors, courseData, searchCourse, setSearch
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Active Instructors</p>
-              <p className="text-2xl font-bold text-gray-900">45</p>
+              <p className="text-2xl font-bold text-gray-900">{activeInstructors || 0}</p>
             </div>
             <GraduationCap className="w-8 h-8 text-green-600" />
           </div>

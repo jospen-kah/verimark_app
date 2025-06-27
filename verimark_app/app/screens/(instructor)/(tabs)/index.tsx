@@ -174,7 +174,6 @@ const InstructorHomeScreen: React.FC<InstructorHomeScreenProps> = ({ title }) =>
                   <ClassCard
                     title={`${session.courseCode} - ${session.courseName}`}
                     time={new Date(session.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    hall={session.hallName}
                     status={session.status === 'open' ? 'Ongoing' : 'Over'}
                   />
                 </TouchableOpacity>

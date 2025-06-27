@@ -30,6 +30,7 @@ const ActiveAttendanceScreen = () => {
   const [remainingTime, setRemainingTime] = useState<string>('00 : 00 : 00');
   const [countdown, setCountdown] = useState<number>(0);
   const [token, setToken] = useState<string | null>(null);
+  const [sessionStartedAt, setSessionStartedAt] = useState<Date | null>(null);
 
   // Get sessionId from params
   const sessionId = params.sessionId as string;
@@ -41,21 +42,48 @@ const ActiveAttendanceScreen = () => {
     sessionId?: string;
     startTime?: string;
     endTime?: string;
+    createdAt?: string; // Add this to get actual session start time
   }
 
   // Define student type
   type Student = {
     id: string;
     name: string;
-    studentId: string;
+    matriNumber: string;
     checkInTime: string;
+    checkOutTime?: string;
     totalMinutes?: number;
-    attendanceStatus?: 'present' | 'absent';
+    attendanceStatus?: 'present' | 'absent' | 'partial';
     isCurrentlyCheckedIn?: boolean;
+    email?: string;
   };
+
+  // Define attendance log response type
+  interface AttendanceLogResponse {
+    success: boolean;
+    data: {
+      attendanceId: string;
+      sessionInfo: {
+        courseId: string;
+        hallId: string;
+        startTime: string;
+        endTime: string;
+        status: string;
+        date: string;
+        createdAt?: string; // Add this
+      };
+      statistics: {
+        totalCheckedIn: number;
+        currentlyCheckedIn: number;
+        completedAttendance: number;
+      };
+      students: Student[];
+    };
+  }
 
   // Define checked-in students response type
   interface CheckedInStudentsResponse {
+    success: boolean;
     attendanceId: string;
     checkedInCount: number;
     students: Student[];
@@ -72,15 +100,45 @@ const ActiveAttendanceScreen = () => {
     return now;
   };
 
-  // Calculate the difference in seconds between start and end time
+  // Calculate remaining time based on actual session start time
+  const calculateRemainingTime = () => {
+    if (!sessionStartedAt || !endTime) return 0;
+    
+    const now = new Date();
+    const sessionEnd = parseTime(endTime);
+    
+    // If we're past the end time, return 0
+    if (now >= sessionEnd) return 0;
+    
+    // Calculate remaining seconds
+    const remainingMs = sessionEnd.getTime() - now.getTime();
+    return Math.max(0, Math.floor(remainingMs / 1000));
+  };
+
+  // Initialize session start time and countdown
   useEffect(() => {
-    if (!startTime || !endTime) return;
-    const start = parseTime(startTime);
-    const end = parseTime(endTime);
-    let diff = Math.floor((end.getTime() - start.getTime()) / 1000);
-    if (diff < 0) diff = 0;
-    setCountdown(diff);
-  }, [startTime, endTime]);
+    // Set session start time to now when component first loads
+    if (!sessionStartedAt) {
+      const startDate = new Date();
+      setSessionStartedAt(startDate);
+      
+      // Calculate initial countdown based on current time to end time
+      if (endTime) {
+        const endDate = parseTime(endTime);
+        const remainingMs = endDate.getTime() - startDate.getTime();
+        const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+        setCountdown(remainingSeconds);
+      }
+    }
+  }, [endTime]);
+
+  // Update countdown when returning to screen
+  useEffect(() => {
+    if (sessionStartedAt && sessionActive) {
+      const remaining = calculateRemainingTime();
+      setCountdown(remaining);
+    }
+  }, [sessionStartedAt, sessionActive, endTime]);
 
   // Fetch session status
   const fetchSessionStatus = async (sessionId: string, token: string): Promise<SessionData> => {
@@ -95,10 +153,23 @@ const ActiveAttendanceScreen = () => {
     return res.data;
   };
 
-  // Fetch checked-in students
+  // Fetch attendance log (complete log with all students)
+  const fetchAttendanceLog = async (sessionId: string, token: string): Promise<AttendanceLogResponse> => {
+    const res = await axios.get(
+      `http://192.168.1.172:3000/api/attendance-log/log/${sessionId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return res.data;
+  };
+
+  // Fetch currently checked-in students (for real-time updates)
   const fetchCheckedInStudents = async (sessionId: string, token: string): Promise<CheckedInStudentsResponse> => {
     const res = await axios.get(
-      `http://192.168.1.172:3000/api/attendance/checked-in/${sessionId}`,
+      `http://192.168.1.172:3000/api/attendance-log/checked-in/${sessionId}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -117,21 +188,34 @@ const ActiveAttendanceScreen = () => {
     enabled: !!sessionId && !!token,
     refetchInterval: 5000, // Poll every 5 seconds for live updates
     staleTime: 0, // Always consider data stale
-    gcTime: 0, // Don't cache the data (replaces cacheTime)
-    refetchOnMount: true, // Always refetch when component mounts
-    refetchOnWindowFocus: true, // Refetch when window gains focus
+    gcTime: 0, // Don't cache the data
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
+  // Use attendance log for complete data when session is closed
+  const { data: attendanceLogData, refetch: refetchAttendanceLog, isLoading: isLoadingLog } = useQuery({
+    queryKey: ['attendanceLog', sessionId, token] as const,
+    queryFn: async (): Promise<AttendanceLogResponse> => {
+      if (!sessionId || !token) throw new Error('Missing sessionId or token');
+      return fetchAttendanceLog(sessionId, token);
+    },
+    enabled: !!sessionId && !!token && sessionData?.status === 'closed',
+    staleTime: 30000, // Cache for 30 seconds when session is closed
+    refetchOnMount: true,
+  });
+
+  // Use real-time checked-in students for active sessions
   const { data: checkedInStudentsData, refetch: refetchStudents, isLoading: isLoadingStudents } = useQuery({
     queryKey: ['checkedInStudents', sessionId, token] as const,
     queryFn: async (): Promise<CheckedInStudentsResponse> => {
       if (!sessionId || !token) throw new Error('Missing sessionId or token');
       return fetchCheckedInStudents(sessionId, token);
     },
-    enabled: !!sessionId && !!token,
+    enabled: !!sessionId && !!token && sessionData?.status !== 'closed',
     refetchInterval: 10000, // Poll every 10 seconds for student updates
     staleTime: 0,
-    gcTime: 0, // Don't cache the data (replaces cacheTime)
+    gcTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
@@ -171,12 +255,12 @@ const ActiveAttendanceScreen = () => {
       setRemainingTime('00 : 00 : 00');
       // Force refetch session status to update UI immediately
       refetchSession();
-      refetchStudents();
+      refetchAttendanceLog();
       
       // Also invalidate any related queries in the cache
       setTimeout(() => {
         refetchSession();
-        refetchStudents();
+        refetchAttendanceLog();
       }, 100);
     },
     onError: (error: any) => {
@@ -188,7 +272,7 @@ const ActiveAttendanceScreen = () => {
       
       // Refetch to ensure we have the latest status
       refetchSession();
-      refetchStudents();
+      refetchAttendanceLog();
     },
   });
 
@@ -218,7 +302,7 @@ const ActiveAttendanceScreen = () => {
       
       // Force refetch to update UI
       await refetchSession();
-      await refetchStudents();
+      await refetchAttendanceLog();
       
       // Show alert after successful API call
       Alert.alert(
@@ -251,7 +335,7 @@ const ActiveAttendanceScreen = () => {
         ]
       );
     }
-  }, [sessionId, token, refetchSession, refetchStudents]);
+  }, [sessionId, token, refetchSession, refetchAttendanceLog]);
 
   // Manual end session handler
   const handleEndSession = React.useCallback(async () => {
@@ -292,7 +376,7 @@ const ActiveAttendanceScreen = () => {
               
               // Force refetch to update UI
               await refetchSession();
-              await refetchStudents();
+              await refetchAttendanceLog();
               
               Alert.alert('Session Ended', 'The attendance session has ended successfully.', [
                 {
@@ -310,7 +394,7 @@ const ActiveAttendanceScreen = () => {
         },
       ]
     );
-  }, [sessionActive, sessionData, sessionId, token, refetchSession, refetchStudents]);
+  }, [sessionActive, sessionData, sessionId, token, refetchSession, refetchAttendanceLog]);
 
   // Timer logic for session countdown
   useEffect(() => {
@@ -331,7 +415,7 @@ const ActiveAttendanceScreen = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [sessionActive, countdown, sessionId, token]);
+  }, [sessionActive, countdown, sessionId, token, autoEndSession]);
 
   // Format countdown seconds to HH : MM : SS
   useEffect(() => {
@@ -351,26 +435,64 @@ const ActiveAttendanceScreen = () => {
 
   useFocusEffect(
     React.useCallback(() => {
+      // Recalculate remaining time when screen comes into focus
+      if (sessionActive && sessionStartedAt) {
+        const remaining = calculateRemainingTime();
+        setCountdown(remaining);
+      }
+      
       // Force refetch when screen comes into focus
       if (sessionId && token) {
         refetchSession();
-        refetchStudents();
+        if (sessionData?.status === 'closed') {
+          refetchAttendanceLog();
+        } else {
+          refetchStudents();
+        }
       }
-    }, [refetchSession, refetchStudents, sessionId, token])
+    }, [refetchSession, refetchAttendanceLog, refetchStudents, sessionId, token, sessionData?.status, sessionActive, sessionStartedAt])
   );
 
   // Also refetch when component mounts
   useEffect(() => {
     if (sessionId && token) {
       refetchSession();
-      refetchStudents();
+      if (sessionData?.status === 'closed') {
+        refetchAttendanceLog();
+      } else {
+        refetchStudents();
+      }
     }
-  }, [sessionId, token, refetchSession, refetchStudents]);
+  }, [sessionId, token, refetchSession, refetchAttendanceLog, refetchStudents, sessionData?.status]);
+
+  // Get students data based on session status
+  const getStudentsData = () => {
+    if (sessionData?.status === 'closed' && attendanceLogData?.success) {
+      return {
+        students: attendanceLogData.data.students,
+        checkedInCount: attendanceLogData.data.statistics.totalCheckedIn,
+        isLoading: isLoadingLog
+      };
+    } else if (checkedInStudentsData?.success) {
+      return {
+        students: checkedInStudentsData.students,
+        checkedInCount: checkedInStudentsData.checkedInCount,
+        isLoading: isLoadingStudents
+      };
+    }
+    return {
+      students: [],
+      checkedInCount: 0,
+      isLoading: isLoadingStudents || isLoadingLog
+    };
+  };
+
+  const { students, checkedInCount, isLoading } = getStudentsData();
 
   // Filter students based on search query
-  const filteredStudents = (checkedInStudentsData?.students || []).filter((student: Student) =>
+  const filteredStudents = students.filter((student: Student) =>
     student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    student.studentId.toLowerCase().includes(searchQuery.toLowerCase())
+    student.matriNumber.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Determine button state based on session status
@@ -382,7 +504,14 @@ const ActiveAttendanceScreen = () => {
     <View style={[styles.studentItem, { backgroundColor: theme.card }]}>
       <View style={styles.studentInfo}>
         <Text style={[styles.studentName, { color: theme.text }]}>{item.name}</Text>
-        <Text style={[styles.studentId, { color: theme.text + '99' }]}>{item.studentId}</Text>
+        <Text style={[styles.studentId, { color: theme.text + '99' }]}>
+          {item.matriNumber}
+        </Text>
+        {item.email && (
+          <Text style={[styles.studentEmail, { color: theme.text + '66' }]}>
+            {item.email}
+          </Text>
+        )}
         {item.totalMinutes !== undefined && (
           <Text style={[styles.totalTime, { color: theme.text + '99' }]}>
             Total: {Math.floor(item.totalMinutes / 60)}h {item.totalMinutes % 60}m
@@ -391,13 +520,23 @@ const ActiveAttendanceScreen = () => {
       </View>
       <View style={styles.checkInInfo}>
         <Text style={styles.checkInTime}>{item.checkInTime}</Text>
+        {item.checkOutTime && (
+          <Text style={[styles.checkOutTime, { color: theme.text + '99' }]}>
+            Out: {item.checkOutTime}
+          </Text>
+        )}
         {item.attendanceStatus && (
           <View style={[
             styles.statusBadge,
-            { backgroundColor: item.attendanceStatus === 'present' ? '#34C759' : '#FF9500' }
+            { 
+              backgroundColor: 
+                item.attendanceStatus === 'present' ? '#34C759' : 
+                item.attendanceStatus === 'partial' ? '#FF9500' : '#FF3B30'
+            }
           ]}>
             <Text style={styles.statusText}>
-              {item.attendanceStatus === 'present' ? 'Present' : 'Partial'}
+              {item.attendanceStatus === 'present' ? 'Present' : 
+               item.attendanceStatus === 'partial' ? 'Partial' : 'Absent'}
             </Text>
           </View>
         )}
@@ -423,7 +562,7 @@ const ActiveAttendanceScreen = () => {
       {/* Course Info */}
       <View style={styles.courseInfo}>
         <Text style={[styles.courseCode, { color: theme.text }]}>
-          {selectedCourse?.code ?? ''} - {selectedCourse?.title ?? ''}
+          {selectedCourse?.code ?? ''} - {selectedCourse?.name ?? selectedCourse?.title ?? ''}
         </Text>
         <Text style={[styles.courseDetails, { color: theme.text + '99' }]}>
           Hall: {selectedHall?.name ?? ''}, {selectedHall?.description ?? ''}, {startTime} - {endTime}
@@ -437,9 +576,11 @@ const ActiveAttendanceScreen = () => {
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
           <Text style={[styles.statNumber, { color: theme.text }]}>
-            {isLoadingStudents ? '...' : (checkedInStudentsData?.checkedInCount || 0)}
+            {isLoading ? '...' : checkedInCount}
           </Text>
-          <Text style={[styles.statLabel, { color: theme.text + '99' }]}>Checked-in</Text>
+          <Text style={[styles.statLabel, { color: theme.text + '99' }]}>
+            {isSessionClosed ? 'Total Attended' : 'Checked-in'}
+          </Text>
         </View>
       </View>
 
@@ -496,7 +637,7 @@ const ActiveAttendanceScreen = () => {
       {/* Students List */}
       <View style={styles.studentsContainer}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          Checked-in Students ({filteredStudents.length})
+          {isSessionClosed ? 'Attendance Log' : 'Checked-in Students'} ({filteredStudents.length})
         </Text>
         <FlatList
           data={filteredStudents}
@@ -507,11 +648,13 @@ const ActiveAttendanceScreen = () => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={[styles.emptyText, { color: theme.text + '99' }]}>
-                {isLoadingStudents 
+                {isLoading 
                   ? 'Loading students...' 
                   : searchQuery 
                     ? 'No students found matching your search' 
-                    : 'No students checked in yet'
+                    : isSessionClosed
+                      ? 'No attendance records found'
+                      : 'No students checked in yet'
                 }
               </Text>
             </View>
@@ -673,6 +816,12 @@ const styles = StyleSheet.create({
   studentId: {
     fontSize: 14,
     color: '#8E8E93',
+    marginBottom: 2,
+  },
+  studentEmail: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginBottom: 2,
   },
   totalTime: {
     fontSize: 12,
@@ -686,6 +835,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#34C759',
     fontWeight: '500',
+    marginBottom: 2,
+  },
+  checkOutTime: {
+    fontSize: 12,
+    color: '#8E8E93',
     marginBottom: 4,
   },
   statusBadge: {
