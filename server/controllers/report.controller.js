@@ -279,7 +279,7 @@ exports.getStudentReport = async (req, res) => {
  * Get all courses for report selection
  * GET /api/reports/courses
  */
-const getCourses = async (req, res) => {
+exports.getCourses = async (req, res) => {
   try {
     const courses = await Course.find({}, 'title code').sort({ title: 1 });
     
